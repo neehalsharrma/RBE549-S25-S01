@@ -1,3 +1,5 @@
 [submodule "RBE549-S25-S01.wiki"]
 	path = RBE549-S25-S01.wiki
 	url = https://github.com/neehalsharrma/RBE549-S25-S01.wiki.git
+	branch = master
+	update = rebase
