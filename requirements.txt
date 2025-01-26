@@ -37,6 +37,7 @@ nvidia-nvjitlink-cu12==12.4.127
 nvidia-nvtx-cu12==12.4.127
 opencv-python==4.11.0.86
 packaging==24.2
+pandas==2.2.3
 parso==0.8.4
 pexpect==4.9.0
 pillow==11.1.0
@@ -48,6 +49,7 @@ pure_eval==0.2.3
 Pygments==2.19.1
 pyparsing==3.2.1
 python-dateutil==2.9.0.post0
+pytz==2024.2
 pyzmq==26.2.0
 scikit-learn==1.6.1
 scipy==1.15.1
@@ -63,4 +65,5 @@ tornado==6.4.2
 traitlets==5.14.3
 triton==3.1.0
 typing_extensions==4.12.2
+tzdata==2025.1
 wcwidth==0.2.13
