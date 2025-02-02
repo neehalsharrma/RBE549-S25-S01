@@ -169,3 +169,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+# Project files
+hw1_myautopano/Phase2/Data/*
