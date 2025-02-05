@@ -9,9 +9,15 @@ import concurrent.futures
 
 # run code from the repo directory
 relative_path="hw1-myautopano\Phase2\Data\Train\\"
-label_file_name="..\TrainLabels.txt"
+label_file_name="..\TrainLabels.csv"
 time_read_write=0
 total_time=0
+
+def setup(relative_path):
+    if not os.path.exists(relative_path+"PA"):
+        os.makedirs(relative_path+"PA")
+    if not os.path.exists(relative_path+"PB"):
+        os.makedirs(relative_path+"PB")
 
 def getListImages(image_path):
     image_directory = os.path.dirname(image_path)
@@ -77,7 +83,7 @@ def getRandomPatches(img, p, patch_size, iname, patches_per_image):
         Pa= img[h1:h4, w1:w4]
         transformed_img= cv2.warpPerspective(img, Hba, (w,h) )
         Pb= transformed_img[h1:h4, w1:w4]
-        aHab= np.subtract(cb,ca)
+        aHab.append(np.subtract(cb,ca).flatten())
         # cv2.imshow("Pa", Pa)
         # cv2.imshow("Pb", Pb)
         # cv2.waitKey()
@@ -90,8 +96,8 @@ def saveRandomPatches(Pa, Pb, iname):
     global time_read_write
     # to start saving from 1
     start_time= time.time()
-    cv2.imwrite(str(relative_path+"processed\\"+iname + "A.jpg"), Pa)
-    cv2.imwrite(str(relative_path+"processed\\"+iname + "B.jpg"), Pb)
+    cv2.imwrite(str(relative_path+"PA\\"+iname + "A.jpg"), Pa)
+    cv2.imwrite(str(relative_path+"PB\\"+iname + "B.jpg"), Pb)
     end_time= time.time()
     time_read_write+=end_time-start_time
 
@@ -149,6 +155,7 @@ def generate_images(p, relative_path, batch_size, patch_size, patches_per_image)
 
 
 start= time.time()
+setup(relative_path)
 # p, image path, batch_size, patch_size, patches_per_image
 generate_images(30, relative_path, 50, 128, 2)
 end= time.time()

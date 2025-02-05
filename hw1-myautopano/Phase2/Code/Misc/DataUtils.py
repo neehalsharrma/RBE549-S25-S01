@@ -53,22 +53,18 @@ def SetupAll(BasePath, CheckPointPath):
     NumTestRunsPerEpoch = 5
 
     # Image Input Shape
-    ImageSize = [32, 32, 3]
-    NumTrainSamples = len(DirNamesTrain)
-
-    # Number of classes
-    NumClasses = 10
+    ImageSize = [128, 128, 3]
+    NumTrainSamples = len(TrainLabels)
 
     return (
         DirNamesTrain,
         SaveCheckPoint,
         ImageSize,
         NumTrainSamples,
-        TrainLabels,
-        NumClasses,
+        TrainLabels
     )
 
-
+# #EDIT#
 def ReadLabels(LabelsPathTrain):
     if not (os.path.isfile(LabelsPathTrain)):
         print("ERROR: Train Labels do not exist in " + LabelsPathTrain)
