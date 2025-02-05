@@ -287,8 +287,7 @@ def main():
         SaveCheckPoint,
         ImageSize,
         NumTrainSamples,
-        TrainCoordinates,
-        NumClasses,
+        TrainCoordinates
     ) = SetupAll(BasePath, CheckPointPath)
 
     # Find Latest Checkpoint File

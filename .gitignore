@@ -1,3 +1,6 @@
+# Ignoring data file
+hw1-myautopano/Phase2/Data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
