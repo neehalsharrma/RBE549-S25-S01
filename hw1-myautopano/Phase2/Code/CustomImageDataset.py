@@ -62,7 +62,7 @@ class CustomImageDataset(Dataset):
 
 
 class UnsupervisedDataSet(Dataset):
-    def __init__(self, annotations_csv, data_dir="../Data/", test=False, transform=None, target_transform=None):
+    def __init__(self, data_dir="../Data/", test=False, transform=None, target_transform=None):
         """
         Assumes the file structure:
         Phase2:
@@ -89,9 +89,8 @@ class UnsupervisedDataSet(Dataset):
         self.data_dir = data_dir
         self.transform = transform
         self.target_transform = target_transform
-        # Path to the csv file containing the homographies
-        csv_path = os.path.join(sub_dir, '' + annotations_csv)
-        self.Hs = pd.read_csv(csv_path)['GroundTruth'].tolist()
+
+
         pa_path = os.path.join(sub_dir, "Original/")
         # Path to the warped sample
         pb_path = os.path.join(sub_dir, "Warped/")
@@ -117,6 +116,6 @@ class UnsupervisedDataSet(Dataset):
         PA = torch.stack([read_image(pa) for pa in pa_path])
         PB = torch.stack([read_image(pb) for pb in pb_path])
         CA = read_image(ca_path)
-        H = torch.tensor([literal_eval(item) for item in self.Hs[idx:idx + 10]])
 
-        return PA, PB, CA, H
+
+        return PA, PB, CA
