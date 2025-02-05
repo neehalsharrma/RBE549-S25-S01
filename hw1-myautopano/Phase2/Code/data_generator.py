@@ -9,7 +9,9 @@ import concurrent.futures
 
 # run code from the repo directory
 relative_path="hw1-myautopano\Phase2\Data\Train\\"
-label_file_name="..\TrainLabels.csv"
+label_file_name="..\..\Code\TxtFiles\TrainLabels.csv"
+PA_paths="..\..\Code\TxtFiles\DirNamesTrainPA.txt"
+PB_paths="..\..\Code\TxtFiles\DirNamesTrainPB.txt"
 time_read_write=0
 total_time=0
 
@@ -65,6 +67,8 @@ def getRandomPatches(img, p, patch_size, iname, patches_per_image):
 
     h, w, _ = img.shape
     aHab=[] #List of tildaH values
+    fileA_paths=[]
+    fileB_paths=[]
     for i in range(patches_per_image):
         # Image coordinates
         # (h1, w1) ... (h2, w2)
@@ -88,33 +92,48 @@ def getRandomPatches(img, p, patch_size, iname, patches_per_image):
         # cv2.imshow("Pb", Pb)
         # cv2.waitKey()
         # cv2.destroyAllWindows()
-        saveRandomPatches(Pa, Pb, iname+"_"+str(i+1))
-    return aHab
+        fileA= str(relative_path+"PA\\"+iname +"_"+str(i+1)+ "A.jpg")
+        fileB= str(relative_path+"PB\\"+iname +"_"+str(i+1)+ "B.jpg")
+        fileA_paths.append(fileA)
+        fileB_paths.append(fileB)
+        saveRandomPatches(Pa, Pb, fileA, fileB)
+    return aHab, fileA_paths, fileB_paths
 
 
-def saveRandomPatches(Pa, Pb, iname):
+def saveRandomPatches(Pa, Pb, fileA, fileB):
     global time_read_write
     # to start saving from 1
     start_time= time.time()
-    cv2.imwrite(str(relative_path+"PA\\"+iname + "A.jpg"), Pa)
-    cv2.imwrite(str(relative_path+"PB\\"+iname + "B.jpg"), Pb)
+    
+    cv2.imwrite(fileA, Pa)
+    cv2.imwrite(fileB, Pb)
     end_time= time.time()
     time_read_write+=end_time-start_time
 
 def generate_images_batch(p, batch_images, batch_num, batch_size, patch_size, patches_per_image):
     i=0
     transformation_list=[]
+    file_A_list=[]
+    file_B_list=[]
     for image in batch_images:
         i+=1
-        aHab= getRandomPatches(image, p, patch_size, str(batch_num*batch_size+i), patches_per_image)
+        aHab, fileAs, fileBs= getRandomPatches(image, p, patch_size, str(batch_num*batch_size+i), patches_per_image)
         transformation_list.extend(aHab)
-    return transformation_list
+        file_A_list.extend(fileAs)
+        file_B_list.extend(fileBs)
+    return transformation_list, file_A_list, file_B_list
 
-def save_list_to_file(data, filename):
+def save_labels_to_file(data, filename):
     """Saves a list of lists to a text file with line breaks and comma-separated values."""
     with open(filename, "w") as file:
         for line in data:
             file.write(",".join(map(str, line)) + "\n")
+
+def save_image_list_to_file(data, filename):
+    with open(filename, "w") as file:
+        for line in data:
+            file.write(line + "\n")
+
 
 # Single threaded function
 # def generate_images(p, relative_path, batch_size, patch_size, patches_per_image):
@@ -133,6 +152,8 @@ def save_list_to_file(data, filename):
 def generate_images(p, relative_path, batch_size, patch_size, patches_per_image):
     image_list = getListImages(relative_path)
     transformation_list = []
+    fileA_list=[]
+    fileB_list=[]
     
     iterations = (len(image_list) + batch_size - 1) // batch_size  # Ceiling division
     
@@ -149,9 +170,13 @@ def generate_images(p, relative_path, batch_size, patch_size, patches_per_image)
 
     # Flatten the list of results
     for result in results:
-        transformation_list.extend(result)
+        transformation_list.extend(result[0])
+        fileA_list.extend(result[1])
+        fileB_list.extend(result[2])
 
-    save_list_to_file(transformation_list, relative_path + label_file_name)
+    save_image_list_to_file(fileA_list, relative_path + PA_paths)
+    save_image_list_to_file(fileB_list, relative_path + PB_paths)
+    save_labels_to_file(transformation_list, relative_path + label_file_name)
 
 
 start= time.time()
