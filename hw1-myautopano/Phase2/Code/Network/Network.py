@@ -73,7 +73,7 @@ class Net(nn.Module):
         #############################
         # Fill your network initialization of choice here!
         #############################
-        ...
+        
         #############################
         # You will need to change the input size and output
         # size for your Spatial transformer network layer!

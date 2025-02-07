@@ -29,7 +29,7 @@ def extract_number(filename):
 # img_dir includes ending //
 class CustomImageDataset(Dataset):
     def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
-        self.Hs= pd.read_csv(annotations_file)
+        self.Hs= pd.read_csv(annotations_file, header=None)
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform

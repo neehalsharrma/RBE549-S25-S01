@@ -6,14 +6,39 @@ import random
 import time
 import re
 import concurrent.futures
+import psutil
+import argparse
+
+# H described as P1, P2, P3, P4
+#       P1 ... P2
+#       P3 ... P4
+
 
 # run code from the repo directory
-relative_path="hw1-myautopano\Phase2\Data\Train\\"
-label_file_name="..\..\Code\TxtFiles\TrainLabels.csv"
-PA_paths="..\..\Code\TxtFiles\DirNamesTrainPA.txt"
-PB_paths="..\..\Code\TxtFiles\DirNamesTrainPB.txt"
-time_read_write=0
-total_time=0
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Generate image patches for training or testing.')
+parser.add_argument('--train', action='store_true', help='Set this flag for training data generation')
+parser.add_argument('--test', action='store_true', help='Set this flag for testing data generation')
+args = parser.parse_args()
+
+if args.train:
+    # For training
+    relative_path = "hw1-myautopano\Phase2\Data\Train\\"
+    label_file_name = "..\..\Code\TxtFiles\TrainLabels.csv"
+    PA_paths = "..\..\Code\TxtFiles\DirNamesTrainPA.txt"
+    PB_paths = "..\..\Code\TxtFiles\DirNamesTrainPB.txt"
+elif args.test:
+    # For testing
+    relative_path = "hw1-myautopano\Phase2\Data\Val\\"
+    label_file_name = "..\..\Code\TxtFiles\TestLabels.csv"
+    PA_paths = "..\..\Code\TxtFiles\DirNamesTestPA.txt"
+    PB_paths = "..\..\Code\TxtFiles\DirNamesTestPB.txt"
+else:
+    raise ValueError("Please specify either --train or --test")
+
+time_read_write = 0
+total_time = 0
 
 def setup(relative_path):
     if not os.path.exists(relative_path+"PA"):
@@ -75,7 +100,8 @@ def getRandomPatches(img, p, patch_size, iname, patches_per_image):
         # (h3, w3) ... (h4, w4)
         coords= getCoordVals(p, h, w, patch_size)
         while coords is None:
-            coords= getCoordVals(p*2//3, h, w, patch_size) 
+            p=p//2
+            coords= getCoordVals(p, h, w, patch_size) 
         w1, w4, h1, h4=coords
         ph1, ph2, ph3, ph4, pw1,  pw2, pw3, pw4 = getPertubVals(p)
         # P1, P2, P3, P4
@@ -125,12 +151,12 @@ def generate_images_batch(p, batch_images, batch_num, batch_size, patch_size, pa
 
 def save_labels_to_file(data, filename):
     """Saves a list of lists to a text file with line breaks and comma-separated values."""
-    with open(filename, "w") as file:
+    with open(filename, "a") as file:
         for line in data:
             file.write(",".join(map(str, line)) + "\n")
 
 def save_image_list_to_file(data, filename):
-    with open(filename, "w") as file:
+    with open(filename, "a") as file:
         for line in data:
             file.write(line + "\n")
 
@@ -139,14 +165,24 @@ def save_image_list_to_file(data, filename):
 # def generate_images(p, relative_path, batch_size, patch_size, patches_per_image):
 #     image_list= getListImages(relative_path)
 #     transformation_list=[]
+#     fileA_list=[]
+#     fileB_list=[]
 #     iterations= (len(image_list)+batch_size-1)//batch_size #Adding batch_size-1 so the division ceils
 #     for i in range(iterations):
 #         print("On batch- ", i)
 #         batch_list= getBatch(image_list, i, batch_size)
 #         batch_images= getImages(batch_list)
-#         transformation_list.extend(generate_images_batch(p, batch_images, i, batch_size, patch_size, patches_per_image))
+#         result= generate_images_batch(p, batch_images, i, batch_size, patch_size, patches_per_image)
+#         save_image_list_to_file(result[1], relative_path + PA_paths)
+#         save_image_list_to_file(result[2], relative_path + PB_paths)
+#         save_labels_to_file(result[0], relative_path + label_file_name)
+#         # transformation_list.extend(result[0])
+#         # fileA_list.extend(result[1])
+#         # fileB_list.extend(result[2])
 
-#     save_list_to_file(transformation_list, relative_path+label_file_name)
+#     # save_image_list_to_file(fileA_list, relative_path + PA_paths)
+#     # save_image_list_to_file(fileB_list, relative_path + PB_paths)
+#     # save_labels_to_file(transformation_list, relative_path + label_file_name)
 
 
 def generate_images(p, relative_path, batch_size, patch_size, patches_per_image):
@@ -165,7 +201,8 @@ def generate_images(p, relative_path, batch_size, patch_size, patches_per_image)
         return generate_images_batch(p, batch_images, i, batch_size, patch_size, patches_per_image)
 
     # Use ThreadPoolExecutor for multithreading
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    max_workers = min(8, psutil.cpu_count(logical=False))  # Adjust based on your system's capabilities
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         results = list(executor.map(process_batch, range(iterations)))
 
     # Flatten the list of results
