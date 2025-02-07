@@ -139,7 +139,7 @@ def TrainOperation(
     ###############################################
     # Fill your optimizer of choice here!
     ###############################################
-    Optimizer = ...
+    Optimizer = AdamW(model.parameters(), lr=0.001)
 
     # Tensorboard
     # Create a summary to monitor loss tensor
