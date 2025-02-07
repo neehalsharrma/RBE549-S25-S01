@@ -1,12 +1,10 @@
-import csv
 import os
 import pandas as pd
-from torchvision.io import read_image
+from torchvision.io import read_image, ImageReadMode
 from torch.utils.data import Dataset
 import torch
-from ast import literal_eval
 import re
-import numpy as np
+from ast import literal_eval
 
 def extract_number(filename):
     match = re.search(r'\d+', filename)
@@ -35,7 +33,7 @@ def extract_index(string):
 
 # img_dir includes ending //
 class CustomImageDataset(Dataset):
-    def __init__(self, annotations_file, img_dir, transform=None, target_transform=None):
+    def __init__(self, annotations_file, img_dir, transform=None):
         self.Hs = pd.read_csv(annotations_file)
         self.img_dir = img_dir
         self.transform = transform
@@ -62,7 +60,7 @@ class CustomImageDataset(Dataset):
 
 
 class UnsupervisedDataSet(Dataset):
-    def __init__(self, data_dir="../Data/", test=False, transform=None, target_transform=None):
+    def __init__(self, annotations_csv, data_dir="../Data/", test=False, transform=None, target_transform=None):
         """
         Assumes the file structure:
         Phase2:
@@ -72,6 +70,7 @@ class UnsupervisedDataSet(Dataset):
                 -GenTrain:
                     -Original
                     -Warped
+                    -Reshaped
                     -CSV
                 -GenTrain:
                     -ibid.
@@ -94,9 +93,11 @@ class UnsupervisedDataSet(Dataset):
         pa_path = os.path.join(sub_dir, "Original/")
         # Path to the warped sample
         pb_path = os.path.join(sub_dir, "Warped/")
-
+        # Path to the csv file containing the homographies
+        csv_path = os.path.join(sub_dir, annotations_csv)
+        self.Hs = pd.read_csv(csv_path)['GroundTruth'].tolist()
         # path to the whole unwarped image
-        self.ca_path = os.path.join(data_dir, "Test/" if test else "Train/")
+        self.ca_path = os.path.join(sub_dir, 'Reshaped/')
 
         self.pa_imgs = sorted([str(pa_path + f) for f in os.listdir(pa_path)], key=extract_index)
         self.pb_imgs = sorted([str(pb_path + f) for f in os.listdir(pb_path)], key=extract_index)
@@ -113,9 +114,15 @@ class UnsupervisedDataSet(Dataset):
         pa_path = self.pa_imgs[idx:idx + 10]
         pb_path = self.pb_imgs[idx:idx + 10]
 
-        PA = torch.stack([read_image(pa) for pa in pa_path])
-        PB = torch.stack([read_image(pb) for pb in pb_path])
-        CA = read_image(ca_path)
+        PA = torch.stack([read_image(pa, mode=ImageReadMode.GRAY) for pa in pa_path])
+        PB = torch.stack([read_image(pb, mode=ImageReadMode.GRAY) for pb in pb_path])
+        IA = read_image(ca_path)
+        IA = torch.stack([IA for _ in range(10)])
+        CA = torch.tensor([literal_eval(item) for item in self.Hs[idx:idx + 10]])
+        CA = torch.reshape(CA,[-1, 8, 1])
+        if self.transform:
+            PA = self.transform(PA)
+            PB = self.transform(PB)
+            CA = self.transform(CA)
 
-
-        return PA, PB, CA
+        return PA, PB, IA, CA
