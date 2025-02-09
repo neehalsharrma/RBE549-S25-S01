@@ -1,5 +1,5 @@
 # Ignoring data file
-hw1-myautopano/Phase2/Data/
+P1-MyAutoPano/Phase2/Data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
