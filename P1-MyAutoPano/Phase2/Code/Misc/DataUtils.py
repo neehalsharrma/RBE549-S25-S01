@@ -17,6 +17,7 @@ import random
 import skimage
 import PIL
 import sys
+import pandas as pd
 
 # Don't generate pyc codes
 sys.dont_write_bytecode = True
@@ -37,60 +38,73 @@ def SetupAll(BasePath, CheckPointPath):
     NumClasses - Number of classes
     """
     # Setup DirNames
-    DirNamesTrain = SetupDirNames(BasePath)
+    # DirNamesTrain = SetupDirNames(BasePath)
 
     # Read and Setup Labels
-    LabelsPathTrain = './TxtFiles/LabelsTrain.txt'
-    TrainLabels = ReadLabels(LabelsPathTrain)
+    relative_path = "hw1-myautopano/Phase2/Code"
+    LabelsPathTrain = relative_path+'/TxtFiles/TrainLabels.csv'
+    DirNamesTrainPA= relative_path+'/TxtFiles/DirNamesTrainPA.txt'
+    DirNamesTrainPB= relative_path+'/TxtFiles/DirNamesTrainPB.txt'
 
+    LabelsPathTest = relative_path+'/TxtFiles/TestLabels.csv'
+    DirNamesTestPA= relative_path+'/TxtFiles/DirNamesTestPA.txt'
+    DirNamesTestPB= relative_path+'/TxtFiles/DirNamesTestPB.txt'
+
+    TrainLabels = ReadLabels(LabelsPathTrain)
+    PaFilesTrain= ReadDirNames(DirNamesTrainPA)
+    PbFilesTrain=ReadDirNames(DirNamesTrainPB)
+
+    TestLabels = ReadLabels(LabelsPathTest)
+    PaFilesTest= ReadDirNames(DirNamesTestPA)
+    PbFilesTest=ReadDirNames(DirNamesTestPB)
     # If CheckPointPath doesn't exist make the path
     if not (os.path.isdir(CheckPointPath)):
         os.makedirs(CheckPointPath)
 
     # Save checkpoint every SaveCheckPoint iteration in every epoch, checkpoint saved automatically after every epoch
-    SaveCheckPoint = 100
+    SaveCheckPoint = 200
     # Number of passes of Val data with MiniBatchSize
-    NumTestRunsPerEpoch = 5
+    NumTestRunsPerEpoch = 1
 
     # Image Input Shape
-    ImageSize = [32, 32, 3]
-    NumTrainSamples = len(DirNamesTrain)
-
-    # Number of classes
-    NumClasses = 10
+    ImageSize = [128, 128, 1]
+    NumTrainSamples = len(TrainLabels)
 
     return (
-        DirNamesTrain,
+        PaFilesTrain,
+        PbFilesTrain,
+        PaFilesTest,
+        PbFilesTest,
         SaveCheckPoint,
         ImageSize,
         NumTrainSamples,
         TrainLabels,
-        NumClasses,
+        TestLabels,
+        NumTestRunsPerEpoch
     )
 
 
 def ReadLabels(LabelsPathTrain):
+    print(os.getcwd())
     if not (os.path.isfile(LabelsPathTrain)):
         print("ERROR: Train Labels do not exist in " + LabelsPathTrain)
         sys.exit()
     else:
-        TrainLabels = open(LabelsPathTrain, "r")
-        TrainLabels = TrainLabels.read()
-        TrainLabels = list(map(float, TrainLabels.split()))
+        TrainLabels = pd.read_csv(LabelsPathTrain, header=None)
 
-    return TrainLabels
+    return TrainLabels.values.tolist()
 
+#EDIT# Not used 
+# def SetupDirNames(BasePath):
+#     """
+#     Inputs:
+#     BasePath is the base path where Images are saved without "/" at the end
+#     Outputs:
+#     Writes a file ./TxtFiles/DirNames.txt with full path to all image files without extension
+#     """
+#     DirNamesTrain = ReadDirNames("./TxtFiles/DirNamesTrain.txt")
 
-def SetupDirNames(BasePath):
-    """
-    Inputs:
-    BasePath is the base path where Images are saved without "/" at the end
-    Outputs:
-    Writes a file ./TxtFiles/DirNames.txt with full path to all image files without extension
-    """
-    DirNamesTrain = ReadDirNames("./TxtFiles/DirNamesTrain.txt")
-
-    return DirNamesTrain
+#     return DirNamesTrain
 
 
 def ReadDirNames(ReadPath):
