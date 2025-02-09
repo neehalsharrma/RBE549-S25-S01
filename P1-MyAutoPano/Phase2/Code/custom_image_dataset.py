@@ -23,15 +23,15 @@ Usage:
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 """
 
-import os
-import re
-from typing import Optional, Tuple
+import os  # Module for interacting with the operating system
+import re  # Module for regular expressions
+from typing import Optional, Tuple  # For type hinting
 
-import pandas as pd
-import torch
-from torch import Tensor
-from torch.utils.data import Dataset
-from torchvision.io import read_image
+import pandas as pd  # Library for data manipulation and analysis
+import torch  # PyTorch library
+from torch import Tensor  # Tensor class from PyTorch
+from torch.utils.data import Dataset  # Dataset class from PyTorch
+from torchvision.io import read_image  # Function to read images from files
 
 
 def extract_number(filename: str) -> int:

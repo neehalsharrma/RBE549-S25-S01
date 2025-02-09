@@ -1,8 +1,8 @@
-import sys
-from typing import List, Dict, Tuple
+import sys  # System-specific parameters and functions
+from typing import List, Dict, Tuple  # Type hinting for better code readability and error checking
 
-import torch
-import torch.nn as nn
+import torch  # Main PyTorch library
+import torch.nn as nn  # PyTorch's neural network library
 
 # Don't generate pyc codes
 sys.dont_write_bytecode = True
