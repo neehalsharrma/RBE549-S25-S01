@@ -243,8 +243,8 @@ def get_random_patches(
         ph1, ph2, ph3, ph4, pw1, pw2, pw3, pw4 = get_perturb_vals(p)  # Get perturbation values
 
         # Define the coordinates for patch A and patch B
-        ca = np.float32([[w1, h1], [w1, h4], [w4, h1], [w4, h4]])
-        cb = np.float32(
+        coords_a = np.array([[w1, h1], [w1, h4], [w4, h1], [w4, h4]], dtype=np.float32)
+        coords_b = np.array(
             [
                 [w1 + pw1, h1 + ph1],
                 [w1 + pw2, h4 + ph2],
@@ -253,7 +253,7 @@ def get_random_patches(
             ]
         )
 
-        hab = cv2.getPerspectiveTransform(ca, cb)  # Get perspective transform matrix
+        hab = cv2.getPerspectiveTransform(coords_a, coords_b)  # Get perspective transform matrix
         hba = np.linalg.inv(hab)  # Get inverse perspective transform matrix
         pa = img[h1:h4, w1:w4]  # Extract patch A
         transformed_img = cv2.warpPerspective(
@@ -261,7 +261,7 @@ def get_random_patches(
         )  # Apply inverse transform
         pb = transformed_img[h1:h4, w1:w4]  # Extract patch B
 
-        a_hab.append(np.subtract(cb, ca).flatten())  # Calculate transformation
+        a_hab.append(np.subtract(coords_b, coords_a).flatten())  # Calculate transformation
 
         # Define file paths for patch A and patch B
         file_a = str(

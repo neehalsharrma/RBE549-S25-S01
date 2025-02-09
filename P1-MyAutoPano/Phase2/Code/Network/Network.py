@@ -1,59 +1,53 @@
-"""
-RBE/CS Fall 2022: Classical and Deep Learning Approaches for
-Geometric Computer Vision
-Project 1: MyAutoPano: Phase 2 Starter Code
-
-
-Author(s):
-Lening Li (lli4@wpi.edu)
-Teaching Assistant in Robotics Engineering,
-Worcester Polytechnic Institute
-"""
-
 import torch.nn as nn
 import sys
 import torch
-import numpy as np
 import torch.nn.functional as F
-import kornia  # You can use this to get the transform and warp in this project
+import pytorch_lightning as pl
 
 # Don't generate pyc codes
 sys.dont_write_bytecode = True
 
 
-def LossFn(delta, img_a, patch_b, corners):
-    ###############################################
-    # Fill your loss function of choice here!
-    ###############################################
+def loss_fn(
+    h_real: torch.Tensor, h_pred: torch.Tensor, criterion: nn.Module = nn.MSELoss()
+) -> torch.Tensor:
+    """
+    Calculate the loss between the real and predicted values.
 
-    ###############################################
-    # You can use kornia to get the transform and warp in this project
-    # Bonus if you implement it yourself
-    ###############################################
-    loss = ...
+    Args:
+        h_real (torch.Tensor): The ground truth tensor.
+        h_pred (torch.Tensor): The predicted tensor.
+        criterion (nn.Module): The loss function to use. Default is Mean Squared Error loss.
+
+    Returns:
+        torch.Tensor: The calculated loss.
+    """
+    loss = criterion(h_real, h_pred)
     return loss
 
 
 class HomographyModel(pl.LightningModule):
-    def __init__(self, hparams):
+    def __init__(self, hparams: dict):
         super(HomographyModel, self).__init__()
-        self.hparams = hparams
-        self.model = Net()
+        self.save_hyperparameters(hparams)
+        input_size = hparams.get('InputSize', 128)  # Default value if not provided
+        output_size = hparams.get('OutputSize', 8)  # Default value if not provided
+        self.model = Net(input_size, output_size)
 
-    def forward(self, a, b):
+    def forward(self, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         return self.model(a, b)
 
     def training_step(self, batch, batch_idx):
-        img_a, patch_a, patch_b, corners, gt = batch
+        img_a: torch.Tensor, patch_a: torch.Tensor, patch_b: torch.Tensor, corners: torch.Tensor, gt: torch.Tensor = batch
         delta = self.model(patch_a, patch_b)
-        loss = LossFn(delta, img_a, patch_b, corners)
+        loss = loss_fn(delta, img_a, patch_b, corners)
         logs = {"loss": loss}
         return {"loss": loss, "log": logs}
 
     def validation_step(self, batch, batch_idx):
-        img_a, patch_a, patch_b, corners, gt = batch
+        img_a: torch.Tensor, patch_a: torch.Tensor, patch_b: torch.Tensor, corners: torch.Tensor, gt: torch.Tensor = batch
         delta = self.model(patch_a, patch_b)
-        loss = LossFn(delta, img_a, patch_b, corners)
+        loss = loss_fn(delta, img_a, patch_b, corners)
         return {"val_loss": loss}
 
     def validation_epoch_end(self, outputs):
@@ -61,41 +55,96 @@ class HomographyModel(pl.LightningModule):
         logs = {"val_loss": avg_loss}
         return {"avg_val_loss": avg_loss, "log": logs}
 
+def conv_block(
+    in_channels: int, out_channels: int, pool: bool = False
+) -> nn.Sequential:
+    """
+    Create a convolutional block with optional pooling.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        pool (bool): If True, apply max pooling. Default is False.
+
+    Returns:
+        nn.Sequential: A sequential container of the convolutional block.
+    """
+    layers = [
+        nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+        nn.BatchNorm2d(out_channels),
+        nn.ReLU(inplace=True),
+    ]
+    if pool:
+        layers.append(nn.MaxPool2d(2))
+    return nn.Sequential(*layers)
 
 class Net(nn.Module):
-    def __init__(self, InputSize, OutputSize):
+    def __init__(self, input_size, output_size):
         """
         Inputs:
-        InputSize - Size of the Input
-        OutputSize - Size of the Output
+        input_size - Size of the Input
+        output_size - Size of the Output
         """
         super().__init__()
-        #############################
-        # Fill your network initialization of choice here!
-        #############################
-        
-        #############################
-        # You will need to change the input size and output
-        # size for your Spatial transformer network layer!
-        #############################
-        # Spatial transformer localization-network
+        # Define the main model as a sequential container
+        self.model = nn.Sequential(
+            # First convolutional block with 2 input channels and 64 output channels
+            conv_block(2, 64),
+            # Second convolutional block with pooling
+            conv_block(64, 64, pool=True),
+            # Third convolutional block
+            conv_block(64, 64),
+            # Fourth convolutional block with pooling
+            conv_block(64, 64, pool=True),
+            # Fifth convolutional block with 128 output channels
+            conv_block(64, 128),
+            # Sixth convolutional block with pooling
+            conv_block(128, 128, pool=True),
+            # Seventh convolutional block
+            conv_block(128, 128),
+            # Eighth convolutional block
+            conv_block(128, 128),
+            # Dropout layer to prevent overfitting
+            nn.Dropout2d(0.4),
+            # Flatten the tensor for the fully connected layer
+            nn.Flatten(),
+            # Fully connected layer with 1024 output features
+            nn.Linear(16 * 16 * 128, 1024),
+            # Dropout layer to prevent overfitting
+            nn.Dropout(0.4),
+            # Final fully connected layer with output size
+            nn.Linear(1024, output_size),
+        )
+
+        # Define the localization network for the Spatial Transformer Network (STN)
         self.localization = nn.Sequential(
+            # First convolutional layer with 1 input channel and 8 output channels
             nn.Conv2d(1, 8, kernel_size=7),
+            # Max pooling layer
             nn.MaxPool2d(2, stride=2),
+            # ReLU activation function
             nn.ReLU(True),
+            # Second convolutional layer with 10 output channels
             nn.Conv2d(8, 10, kernel_size=5),
+            # Max pooling layer
             nn.MaxPool2d(2, stride=2),
+            # ReLU activation function
             nn.ReLU(True),
         )
 
-        # Regressor for the 3 * 2 affine matrix
+        # Define the regressor for the 3x2 affine matrix
         self.fc_loc = nn.Sequential(
-            nn.Linear(10 * 3 * 3, 32), nn.ReLU(True), nn.Linear(32, 3 * 2)
+            # Fully connected layer with 32 output features
+            nn.Linear(10 * 3 * 3, 32),
+            # ReLU activation function
+            nn.ReLU(True),
+            # Final fully connected layer with 6 output features (3x2 affine matrix)
+            nn.Linear(32, 3 * 2),
         )
 
         # Initialize the weights/bias with identity transformation
-        self.fc_loc[2].weight.data.zero_()
-        self.fc_loc[2].bias.data.copy_(
+        self.fc_loc[1].weight.data.zero_()
+        self.fc_loc[1].bias.data.copy_(
             torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float)
         )
 
@@ -115,15 +164,19 @@ class Net(nn.Module):
 
         return x
 
-    def forward(self, xa, xb):
+    def forward(self, xa: torch.Tensor, xb: torch.Tensor) -> torch.Tensor:
         """
-        Input:
-        xa is a MiniBatch of the image a
-        xb is a MiniBatch of the image b
-        Outputs:
-        out - output of the network
+        Forward pass of the network.
+
+        Args:
+            xa (torch.Tensor): A mini-batch of input images a with shape (batch_size, channels, height, width).
+            xb (torch.Tensor): A mini-batch of input images b with shape (batch_size, channels, height, width).
+
+        Returns:
+            torch.Tensor: The output of the network.
         """
-        #############################
-        # Fill your network structure of choice here!
-        #############################
+        # Concatenate xa and xb along the channel dimension
+        x = torch.stack((xa, xb), dim=1)
+        # Pass the concatenated tensor through the model
+        out = self.model(x)
         return out

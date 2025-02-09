@@ -38,6 +38,49 @@ class UnsupervisedHomographyNet(pl.LightningModule):
         self.model = Net(input_size, output_size)
         self.lr = hparams.get('lr', 0.001)  # Default learning rate if not provided
 
+        # Define the localization network for the Spatial Transformer Network (STN)
+        self.localization = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=7),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True),
+            nn.Conv2d(8, 10, kernel_size=5),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True),
+        )
+
+        # Define the regressor for the 3x2 affine matrix
+        self.fc_loc = nn.Sequential(
+            nn.Linear(10 * 3 * 3, 32),
+            nn.ReLU(True),
+            nn.Linear(32, 3 * 2),
+        )
+
+        # Initialize the weights/bias with identity transformation
+        self.fc_loc[2].weight.data.zero_()
+        self.fc_loc[2].bias.data.copy_(
+            torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float)
+        )
+
+    def stn(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Spatial transformer network forward function.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Transformed input tensor.
+        """
+        xs = self.localization(x)
+        xs = xs.view(-1, 10 * 3 * 3)
+        theta = self.fc_loc(xs)
+        theta = theta.view(-1, 2, 3)
+
+        grid = F.affine_grid(theta, x.size())
+        x = F.grid_sample(x, grid)
+
+        return x
+
     def forward(self, img1: torch.Tensor, img2: torch.Tensor) -> torch.Tensor:
         """
         Perform the forward pass to estimate the homography.

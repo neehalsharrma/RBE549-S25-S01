@@ -161,7 +161,7 @@ class Net(BaseModel):
     Methods:
         __init__(input_size: int, output_size: int) -> None:
             Initializes the network with the given input and output sizes.
-        forward(xa: torch.Tensor) -> torch.Tensor:
+        forward(xa: torch.Tensor, xb: torch.Tensor) -> torch.Tensor:
             Performs the forward pass of the network on the input tensor.
     """
 
@@ -190,14 +190,19 @@ class Net(BaseModel):
             nn.Linear(1024, output_size),
         )
 
-    def forward(self, xa: torch.Tensor) -> torch.Tensor:
+    def forward(self, xa: torch.Tensor, xb: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the network.
 
         Args:
-            xa (torch.Tensor): A mini-batch of input images with shape (batch_size, channels, height, width).
+            xa (torch.Tensor): A mini-batch of input images a with shape (batch_size, channels, height, width).
+            xb (torch.Tensor): A mini-batch of input images b with shape (batch_size, channels, height, width).
 
         Returns:
             torch.Tensor: The output of the network.
         """
-        return self.model(xa)
+        # Concatenate xa and xb along the channel dimension
+        x = torch.cat((xa, xb), dim=1)
+        # Pass the concatenated tensor through the model
+        out = self.model(x)
+        return out
