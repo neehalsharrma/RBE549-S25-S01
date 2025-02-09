@@ -8,6 +8,7 @@ for efficient processing.
 Usage:
     python data_generator.py --train  # For training data generation
     python data_generator.py --test   # For testing data generation
+    (Run at the package level)
 
 Command-line arguments:
     --train: Set this flag for training data generation
@@ -61,18 +62,19 @@ args = parser.parse_args()
 # Set paths based on whether training or testing
 if args.train:
     # For training
-    RELATIVE_PATH = os.path.join("P1-MyAutoPano", "Phase2", "Data", "Train", "")
-    LABEL_FILE_NAME = os.path.join("..", "..", "Code", "TxtFiles", "TrainLabels.csv")
-    PA_PATHS = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTrainPA.txt")
-    PB_PATHS = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTrainPB.txt")
+    RELATIVE_PATH = "Data/Train/"
+    LABEL_FILE_NAME = "Code/TxtFiles/TrainLabels.csv"
+    PA_PATHS = "Code/TxtFiles/DirNamesTrainPA.txt"
+    PB_PATHS = "Code/TxtFiles/DirNamesTrainPB.txt"
 elif args.test:
     # For testing
-    RELATIVE_PATH = os.path.join("P1-MyAutoPano", "Phase2", "Data", "Val", "")
-    LABEL_FILE_NAME = os.path.join("..", "..", "Code", "TxtFiles", "TestLabels.csv")
-    PA_PATHS = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTestPA.txt")
-    PB_PATHS = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTestPB.txt")
+    RELATIVE_PATH = "Data/Val/"
+    LABEL_FILE_NAME = "Code/TxtFiles/TestLabels.csv"
+    PA_PATHS = "Code/TxtFiles/DirNamesTestPA.txt"
+    PB_PATHS = "Code/TxtFiles/DirNamesTestPB.txt"
 else:
     raise ValueError("Please specify either --train or --test")
+
 
 # Initialize timing variables
 TIME_READ_WRITE = 0
@@ -424,11 +426,10 @@ def generate_images(
         file_b_list.extend(result[2])
 
     # Save the file paths and transformations to disk
-    save_image_list_to_file(file_a_list, os.path.join(relative_path, PA_PATHS))
-    save_image_list_to_file(file_b_list, os.path.join(relative_path, PB_PATHS))
+    save_image_list_to_file(file_a_list, PA_PATHS)
+    save_image_list_to_file(file_b_list, PB_PATHS)
     save_labels_to_file(
-        transformation_list, os.path.join(relative_path, LABEL_FILE_NAME)
-    )
+        transformation_list, LABEL_FILE_NAME)
 
 
 # Measure the total execution time
