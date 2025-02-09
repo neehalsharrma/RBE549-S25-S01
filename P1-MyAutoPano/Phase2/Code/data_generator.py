@@ -1,54 +1,109 @@
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
-import os
-import random
-import time
-import re
-import concurrent.futures
-import psutil
-import argparse
+"""
+data_generator.py
 
-# H described as P1, P2, P3, P4
-#       P1 ... P2
-#       P3 ... P4
+This module generates image patches for training or testing purposes. It includes functions
+to read images, generate random patches, save patches to disk, and manage multithreading
+for efficient processing.
 
+Usage:
+    python data_generator.py --train  # For training data generation
+    python data_generator.py --test   # For testing data generation
 
-# run code from the repo directory
+Command-line arguments:
+    --train: Set this flag for training data generation
+    --test: Set this flag for testing data generation
+    --workers: Number of workers for multithreading (default: min(8, number of logical CPUs))
+
+Functions:
+    setup(relative_path: str) -> None
+    get_list_images(image_path: str) -> List[str]
+    get_batch(image_list: List[str], batch_num: int, size: int) -> List[str]
+    get_images(image_list: List[str]) -> List[np.ndarray]
+    get_perturb_vals(p: int) -> List[int]
+    get_coord_vals(p: int, h: int, w: int, patch_size: int) -> Optional[List[int]]
+    get_random_patches(img: np.ndarray, p: int, patch_size: int, iname: str, patches_per_image: int) -> Tuple[List[np.ndarray], List[str], List[str]]
+    save_random_patches(pa: np.ndarray, pb: np.ndarray, file_a: str, file_b: str) -> None
+    generate_images_batch(p: int, batch_images: List[np.ndarray], batch_num: int, batch_size: int, patch_size: int, patches_per_image: int) -> Tuple[List[np.ndarray], List[str], List[str]]
+    save_labels_to_file(data: List[List[float]], filename: str) -> None
+    save_image_list_to_file(data: List[str], filename: str) -> None
+    generate_images(p: int, relative_path: str, batch_size: int, patch_size: int, patches_per_image: int) -> None
+"""
+
+import cv2  # OpenCV for image processing
+import numpy as np  # NumPy for numerical operations
+import os  # OS module for file operations
+import random  # Random module for generating random numbers
+import time  # Time module for measuring execution time
+import re  # Regular expressions for string operations
+import concurrent.futures  # For multithreading
+import psutil  # For system and process utilities
+import argparse  # For command-line argument parsing
+from typing import List, Tuple, Optional  # For type hinting
 
 # Parse command line arguments
-parser = argparse.ArgumentParser(description='Generate image patches for training or testing.')
-parser.add_argument('--train', action='store_true', help='Set this flag for training data generation')
-parser.add_argument('--test', action='store_true', help='Set this flag for testing data generation')
+parser = argparse.ArgumentParser(
+    description="Generate image patches for training or testing."
+)
+parser.add_argument(
+    "--train", action="store_true", help="Set this flag for training data generation"
+)
+parser.add_argument(
+    "--test", action="store_true", help="Set this flag for testing data generation"
+)
+parser.add_argument(
+    "--workers",
+    type=int,
+    default=min(8, psutil.cpu_count(logical=False)),
+    help="Number of workers for multithreading",
+)
 args = parser.parse_args()
 
+# Set paths based on whether training or testing
 if args.train:
     # For training
-    relative_path = os.path.join("hw1-myautopano", "Phase2", "Data", "Train", "")
-    label_file_name = os.path.join("..", "..", "Code", "TxtFiles", "TrainLabels.csv")
-    PA_paths = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTrainPA.txt")
-    PB_paths = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTrainPB.txt")
+    RELATIVE_PATH = os.path.join("P1-MyAutoPano", "Phase2", "Data", "Train", "")
+    LABEL_FILE_NAME = os.path.join("..", "..", "Code", "TxtFiles", "TrainLabels.csv")
+    PA_PATHS = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTrainPA.txt")
+    PB_PATHS = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTrainPB.txt")
 elif args.test:
     # For testing
-    relative_path = os.path.join("hw1-myautopano", "Phase2", "Data", "Val", "")
-    label_file_name = os.path.join("..", "..", "Code", "TxtFiles", "TestLabels.csv")
-    PA_paths = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTestPA.txt")
-    PB_paths = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTestPB.txt")
+    RELATIVE_PATH = os.path.join("P1-MyAutoPano", "Phase2", "Data", "Val", "")
+    LABEL_FILE_NAME = os.path.join("..", "..", "Code", "TxtFiles", "TestLabels.csv")
+    PA_PATHS = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTestPA.txt")
+    PB_PATHS = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTestPB.txt")
 else:
     raise ValueError("Please specify either --train or --test")
 
-time_read_write = 0
-total_time = 0
+# Initialize timing variables
+TIME_READ_WRITE = 0
+TOTAL_TIME = 0
 
-def setup(relative_path):
-    if not os.path.exists(os.path.join(relative_path,"PA")):
-        os.makedirs(os.path.join(relative_path,"PA"))
-        print("Created PA directory", os.path.join(relative_path,"PA"))
-    if not os.path.exists(os.path.join(relative_path,"PB")):
-        os.makedirs(os.path.join(relative_path,"PB"))
-        print("Created PB directory", os.path.join(relative_path,"PB"))
 
-def getListImages(image_path):
+def setup(relative_path: str) -> None:
+    """
+    Create directories for PA and PB if they do not exist.
+
+    Args:
+        relative_path (str): The base path where directories will be created.
+    """
+    if not os.path.exists(os.path.join(relative_path, "PA")):
+        os.makedirs(os.path.join(relative_path, "PA"))
+        print("Created PA directory", os.path.join(relative_path, "PA"))
+    if not os.path.exists(os.path.join(relative_path, "PB")):
+        os.makedirs(os.path.join(relative_path, "PB"))
+        print("Created PB directory", os.path.join(relative_path, "PB"))
+
+
+def get_list_images(image_path: str) -> List[str]:
+    """
+    Get a sorted list of image files in the specified directory.
+
+    Args:
+        image_path (str): The path to the directory containing images.
+
+    Returns:
+        List[str]: A sorted list of image filenames.
+    """
     print("Looking for images in -", image_path)
     image_directory = os.path.dirname(image_path)
 
@@ -57,176 +112,333 @@ def getListImages(image_path):
     print("Total files found- ", len(all_files))
     # Filter out the image files (assuming they are .jpg files)
     image_files = [f for f in all_files if f.endswith(".jpg")]
-    sorted_files = sorted(image_files, key=lambda x: int(re.search(r'\d+', x).group()))
+    sorted_files = sorted(image_files, key=lambda x: int(re.search(r"\d+", x).group()))
     print("Total image files found- ", len(sorted_files))
     return sorted_files
 
-def getBatch(image_list, batchNum, size):
-    tot= len(image_list)
-    return image_list[batchNum*size:min((batchNum+1)*size, tot)]
 
-def getImages(image_list):
-    global time_read_write
-    images=[]
-    start_time=time.time()
+def get_batch(image_list: List[str], batch_num: int, size: int) -> List[str]:
+    """
+    Get a batch of images from the list.
+
+    Args:
+        image_list (List[str]): The list of image filenames.
+        batch_num (int): The batch number.
+        size (int): The size of the batch.
+
+    Returns:
+        List[str]: A list of image filenames for the batch.
+    """
+    total = len(image_list)
+    # Calculate the start and end indices for the batch
+    start_index = batch_num * size
+    end_index = min((batch_num + 1) * size, total)
+    # Return the sublist of image filenames for the batch
+    return image_list[start_index:end_index]
+
+
+def get_images(image_list: List[str]) -> List[np.ndarray]:
+    """
+    Read images from the list of filenames.
+
+    Args:
+        image_list (List[str]): The list of image filenames.
+
+    Returns:
+        List[np.ndarray]: A list of images.
+    """
+    global TIME_READ_WRITE
+    images = []
+    start_time = time.time()
+    # Read each image file and append it to the images list
     for image_file in image_list:
-        images.append(cv2.imread(relative_path+image_file))
-    end_time= time.time()
-    time_read_write+=end_time-start_time
+        images.append(cv2.imread(RELATIVE_PATH + image_file))
+    end_time = time.time()
+    # Update the time spent on reading images
+    TIME_READ_WRITE += end_time - start_time
     return images
 
-def getPertubVals(p):
-    return [random.randint(-p,p) for i in range(8)]
 
-def getCoordVals(p, h, w, patch_size):
-    # l= [random.randint(200,h-(2*p)) for i in range(2)]
-    # l.extend([random.randint(200,w-(2*p)) for i in range(2)])
-    limitx= w-patch_size-(2*p)
-    limity= h-(2*p)-patch_size
-    if(limitx<2*p or limity<2*p):
-        return None
-    x1= random.randint(2*p, limitx)
-    y1= random.randint(2*p, limity)
-    l=[x1, x1+patch_size, y1, y1+patch_size]
-    return l
+def get_perturb_vals(p: int) -> List[int]:
+    """
+    Generate random perturbation values.
 
-def getRandomPatches(img, p, patch_size, iname, patches_per_image):
-    # cv2.imshow("IMG", img)
-    # cv2.waitKey()
-    # cv2.destroyAllWindows()
+    Args:
+        p (int): The range for perturbation values.
 
-    h, w, _ = img.shape
-    aHab=[] #List of tildaH values
-    fileA_paths=[]
-    fileB_paths=[]
-    for i in range(patches_per_image):
-        # Image coordinates
-        # (h1, w1) ... (h2, w2)
-        # (h3, w3) ... (h4, w4)
-        coords= getCoordVals(p, h, w, patch_size)
-        while coords is None:
-            p=p//2
-            coords= getCoordVals(p, h, w, patch_size) 
-        w1, w4, h1, h4=coords
-        ph1, ph2, ph3, ph4, pw1,  pw2, pw3, pw4 = getPertubVals(p)
-        # P1, P2, P3, P4
-        ca = np.float32([[w1, h1], [w1, h4], [w4, h1], [w4, h4]])
-        cb = np.float32([[w1+pw1, h1+ph1], [w1+pw2, h4+ph2], [w4+pw3, h1+ph3], [w4+pw4, h4+ph4]])
-
-        Hab= cv2.getPerspectiveTransform(ca, cb)
-        Hba= np.linalg.inv(Hab)
-        Pa= img[h1:h4, w1:w4]
-        transformed_img= cv2.warpPerspective(img, Hba, (w,h) )
-        Pb= transformed_img[h1:h4, w1:w4]
-        aHab.append(np.subtract(cb,ca).flatten())
-        # cv2.imshow("Pa", Pa)
-        # cv2.imshow("Pb", Pb)
-        # cv2.waitKey()
-        # cv2.destroyAllWindows()
-        fileA= str(os.path.join(relative_path,os.path.join("PA",iname +"_"+str(i+1)+ "A.jpg")))
-        fileB= str(os.path.join(relative_path,os.path.join("PB",iname +"_"+str(i+1)+ "B.jpg")))
-        fileA_paths.append(fileA)
-        fileB_paths.append(fileB)
-        saveRandomPatches(Pa, Pb, fileA, fileB)
-    return aHab, fileA_paths, fileB_paths
+    Returns:
+        List[int]: A list of random perturbation values.
+    """
+    return [random.randint(-p, p) for _ in range(8)]
 
 
-def saveRandomPatches(Pa, Pb, fileA, fileB):
-    global time_read_write
-    # to start saving from 1
-    start_time= time.time()
+def get_coord_vals(p: int, h: int, w: int, patch_size: int) -> Optional[List[int]]:
+    """
+    Generate random coordinates for patches.
+
+    Args:
+        p (int): The perturbation value.
+        h (int): The height of the image.
+        w (int): The width of the image.
+        patch_size (int): The size of the patch.
+
+    Returns:
+        Optional[List[int]]: A list of coordinates or None if limits are exceeded.
+    """
+    # Calculate the limits for x and y coordinates
+    limit_x = w - patch_size - (2 * p)
+    limit_y = h - (2 * p) - patch_size
     
-    cv2.imwrite(fileA, Pa)
-    cv2.imwrite(fileB, Pb)
-    end_time= time.time()
-    time_read_write+=end_time-start_time
+    # Check if the limits are valid
+    if limit_x < 2 * p or limit_y < 2 * p:
+        return None
+    
+    # Generate random coordinates within the limits
+    x1 = random.randint(2 * p, limit_x)
+    y1 = random.randint(2 * p, limit_y)
+    
+    # Return the coordinates as a list
+    return [x1, x1 + patch_size, y1, y1 + patch_size]
 
-def generate_images_batch(p, batch_images, batch_num, batch_size, patch_size, patches_per_image):
-    i=0
-    transformation_list=[]
-    file_A_list=[]
-    file_B_list=[]
+
+def get_random_patches(
+    img: np.ndarray, p: int, patch_size: int, iname: str, patches_per_image: int
+) -> Tuple[List[np.ndarray], List[str], List[str]]:
+    """
+    Generate random patches from an image.
+
+    Args:
+        img (np.ndarray): The input image.
+        p (int): The perturbation value.
+        patch_size (int): The size of the patch.
+        iname (str): The image name.
+        patches_per_image (int): The number of patches per image.
+
+    Returns:
+        Tuple[List[np.ndarray], List[str], List[str]]: A tuple containing the list of transformations, file A paths, and file B paths.
+    """
+    h, w, _ = img.shape  # Get the height and width of the image
+    a_hab = []  # List of tildaH values
+    file_a_paths = []  # List of file paths for patch A
+    file_b_paths = []  # List of file paths for patch B
+
+    for i in range(patches_per_image):
+        coords = get_coord_vals(p, h, w, patch_size)  # Get random coordinates for patches
+        max_iterations = 10  # Maximum number of iterations to find valid coordinates
+        iterations = 0
+        min_p = 1  # Minimum perturbation value
+
+        # Try to find valid coordinates within the maximum number of iterations
+        while coords is None and iterations < max_iterations and p > min_p:
+            p = p // 2  # Reduce the perturbation value
+            coords = get_coord_vals(p, h, w, patch_size)  # Get new coordinates
+            iterations += 1
+
+        if coords is None:
+            raise ValueError("Unable to find valid coordinates for patches.")
+
+        w1, w4, h1, h4 = coords  # Extract coordinates
+        ph1, ph2, ph3, ph4, pw1, pw2, pw3, pw4 = get_perturb_vals(p)  # Get perturbation values
+
+        # Define the coordinates for patch A and patch B
+        ca = np.float32([[w1, h1], [w1, h4], [w4, h1], [w4, h4]])
+        cb = np.float32(
+            [
+                [w1 + pw1, h1 + ph1],
+                [w1 + pw2, h4 + ph2],
+                [w4 + pw3, h1 + ph3],
+                [w4 + pw4, h4 + ph4],
+            ]
+        )
+
+        hab = cv2.getPerspectiveTransform(ca, cb)  # Get perspective transform matrix
+        hba = np.linalg.inv(hab)  # Get inverse perspective transform matrix
+        pa = img[h1:h4, w1:w4]  # Extract patch A
+        transformed_img = cv2.warpPerspective(
+            img, hba, (w, h)
+        )  # Apply inverse transform
+        pb = transformed_img[h1:h4, w1:w4]  # Extract patch B
+
+        a_hab.append(np.subtract(cb, ca).flatten())  # Calculate transformation
+
+        # Define file paths for patch A and patch B
+        file_a = str(
+            os.path.join(
+                RELATIVE_PATH, os.path.join("PA", iname + "_" + str(i + 1) + "A.jpg")
+            )
+        )
+        file_b = str(
+            os.path.join(
+                RELATIVE_PATH, os.path.join("PB", iname + "_" + str(i + 1) + "B.jpg")
+            )
+        )
+
+        file_a_paths.append(file_a)  # Add file path for patch A to the list
+        file_b_paths.append(file_b)  # Add file path for patch B to the list
+
+        save_random_patches(pa, pb, file_a, file_b)  # Save patches to disk
+
+    return a_hab, file_a_paths, file_b_paths  # Return the transformations and file paths
+
+
+def save_random_patches(
+    pa: np.ndarray, pb: np.ndarray, file_a: str, file_b: str
+) -> None:
+    """
+    Save random patches to disk.
+
+    Args:
+        pa (np.ndarray): The patch A image.
+        pb (np.ndarray): The patch B image.
+        file_a (str): The file path for patch A.
+        file_b (str): The file path for patch B.
+    """
+    global TIME_READ_WRITE
+    start_time = time.time()
+    cv2.imwrite(file_a, pa)  # Save patch A
+    cv2.imwrite(file_b, pb)  # Save patch B
+    end_time = time.time()
+    TIME_READ_WRITE += end_time - start_time  # Update the time spent on writing images
+
+
+def generate_images_batch(
+    p: int,
+    batch_images: List[np.ndarray],
+    batch_num: int,
+    batch_size: int,
+    patch_size: int,
+    patches_per_image: int,
+) -> Tuple[List[np.ndarray], List[str], List[str]]:
+    """
+    Generate a batch of images with random patches.
+
+    Args:
+        p (int): The perturbation value.
+        batch_images (List[np.ndarray]): The list of batch images.
+        batch_num (int): The batch number.
+        batch_size (int): The size of the batch.
+        patch_size (int): The size of the patch.
+        patches_per_image (int): The number of patches per image.
+
+    Returns:
+        Tuple[List[np.ndarray], List[str], List[str]]: A tuple containing the list of transformations, file A paths, and file B paths.
+    """
+    i = 0
+    transformation_list = []  # List to store transformations
+    file_a_list = []  # List to store file paths for patch A
+    file_b_list = []  # List to store file paths for patch B
     for image in batch_images:
-        i+=1
-        aHab, fileAs, fileBs= getRandomPatches(image, p, patch_size, str(batch_num*batch_size+i), patches_per_image)
-        transformation_list.extend(aHab)
-        file_A_list.extend(fileAs)
-        file_B_list.extend(fileBs)
-    return transformation_list, file_A_list, file_B_list
+        i += 1
+        # Generate random patches for the image
+        a_hab, file_as, file_bs = get_random_patches(
+            image, p, patch_size, str(batch_num * batch_size + i), patches_per_image
+        )
+        transformation_list.extend(a_hab)  # Add transformations to the list
+        file_a_list.extend(file_as)  # Add file paths for patch A to the list
+        file_b_list.extend(file_bs)  # Add file paths for patch B to the list
+    return transformation_list, file_a_list, file_b_list  # Return the results
 
-def save_labels_to_file(data, filename):
-    """Saves a list of lists to a text file with line breaks and comma-separated values."""
-    with open(filename, "w") as file:
+
+def save_labels_to_file(data: List[List[float]], filename: str) -> None:
+    """
+    Save labels to a file.
+
+    Args:
+        data (List[List[float]]): The list of labels.
+        filename (str): The file path to save the labels.
+    """
+    # Open the file in write mode with UTF-8 encoding
+    with open(filename, "w", encoding="utf-8") as file:
+        # Write each label list as a comma-separated string
         for line in data:
             file.write(",".join(map(str, line)) + "\n")
 
-def save_image_list_to_file(data, filename):
-    with open(filename, "w") as file:
+
+def save_image_list_to_file(data: List[str], filename: str) -> None:
+    """
+    Save image list to a file.
+
+    Args:
+        data (List[str]): The list of image file paths.
+        filename (str): The file path to save the image list.
+    """
+    # Open the file in write mode with UTF-8 encoding
+    with open(filename, "w", encoding="utf-8") as file:
+        # Write each image file path on a new line
         for line in data:
             file.write(line + "\n")
 
 
-# Single threaded function
-# def generate_images(p, relative_path, batch_size, patch_size, patches_per_image):
-#     image_list= getListImages(relative_path)
-#     transformation_list=[]
-#     fileA_list=[]
-#     fileB_list=[]
-#     iterations= (len(image_list)+batch_size-1)//batch_size #Adding batch_size-1 so the division ceils
-#     for i in range(iterations):
-#         print("On batch- ", i)
-#         batch_list= getBatch(image_list, i, batch_size)
-#         batch_images= getImages(batch_list)
-#         result= generate_images_batch(p, batch_images, i, batch_size, patch_size, patches_per_image)
-#         save_image_list_to_file(result[1], relative_path + PA_paths)
-#         save_image_list_to_file(result[2], relative_path + PB_paths)
-#         save_labels_to_file(result[0], relative_path + label_file_name)
-#         # transformation_list.extend(result[0])
-#         # fileA_list.extend(result[1])
-#         # fileB_list.extend(result[2])
+def generate_images(
+    p: int, relative_path: str, batch_size: int, patch_size: int, patches_per_image: int
+) -> None:
+    """
+    Generate images with random patches.
 
-#     # save_image_list_to_file(fileA_list, relative_path + PA_paths)
-#     # save_image_list_to_file(fileB_list, relative_path + PB_paths)
-#     # save_labels_to_file(transformation_list, relative_path + label_file_name)
+    Args:
+        p (int): The perturbation value.
+        relative_path (str): The base path for saving images.
+        batch_size (int): The size of the batch.
+        patch_size (int): The size of the patch.
+        patches_per_image (int): The number of patches per image.
+    """
+    # Get the list of image filenames
+    image_list = get_list_images(relative_path)
+    transformation_list = []  # List to store transformations
+    file_a_list = []  # List to store file paths for patch A
+    file_b_list = []  # List to store file paths for patch B
 
-
-def generate_images(p, relative_path, batch_size, patch_size, patches_per_image):
-    image_list = getListImages(relative_path)
-    transformation_list = []
-    fileA_list=[]
-    fileB_list=[]
-    
+    # Calculate the number of iterations (batches)
     iterations = (len(image_list) + batch_size - 1) // batch_size  # Ceiling division
     print("Total iterations: ", iterations)
 
-    def process_batch(i):
-        """Function to process a single batch"""
+    def process_batch(i: int) -> Tuple[List[np.ndarray], List[str], List[str]]:
+        """Process a single batch of images.
+
+        Args:
+            i (int): The batch index.
+
+        Returns:
+            Tuple[List[np.ndarray], List[str], List[str]]: A tuple containing the list of transformations, file A paths, and file B paths.
+        """
         print("On batch- ", i)
-        batch_list = getBatch(image_list, i, batch_size)
-        batch_images = getImages(batch_list)
-        return generate_images_batch(p, batch_images, i, batch_size, patch_size, patches_per_image)
+        # Get the list of image filenames for the batch
+        batch_list = get_batch(image_list, i, batch_size)
+        # Read the images from the filenames
+        batch_images = get_images(batch_list)
+        # Generate random patches for the batch of images
+        return generate_images_batch(
+            p, batch_images, i, batch_size, patch_size, patches_per_image
+        )
 
     # Use ThreadPoolExecutor for multithreading
-    max_workers = min(8, psutil.cpu_count(logical=False))  # Adjust based on your system's capabilities
+    max_workers = args.workers  # Number of workers for multithreading
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Process each batch in parallel
         results = list(executor.map(process_batch, range(iterations)))
 
     # Flatten the list of results
     for result in results:
         transformation_list.extend(result[0])
-        fileA_list.extend(result[1])
-        fileB_list.extend(result[2])
+        file_a_list.extend(result[1])
+        file_b_list.extend(result[2])
 
-    save_image_list_to_file(fileA_list, os.path.join(relative_path, PA_paths))
-    save_image_list_to_file(fileB_list, os.path.join(relative_path, PB_paths))
-    save_labels_to_file(transformation_list, os.path.join(relative_path, label_file_name))
+    # Save the file paths and transformations to disk
+    save_image_list_to_file(file_a_list, os.path.join(relative_path, PA_PATHS))
+    save_image_list_to_file(file_b_list, os.path.join(relative_path, PB_PATHS))
+    save_labels_to_file(
+        transformation_list, os.path.join(relative_path, LABEL_FILE_NAME)
+    )
 
 
-start= time.time()
-setup(relative_path)
-# p, image path, batch_size, patch_size, patches_per_image
-generate_images(30, relative_path, 50, 128, 2)
-end= time.time()
-total_time= end- start
-
-print("Total time- ", total_time, "    time_read_write- ", time_read_write)
+# Measure the total execution time
+start = time.time()
+# Setup the directories for saving patches
+setup(RELATIVE_PATH)
+# Generate images with random patches
+generate_images(30, RELATIVE_PATH, 50, 128, 2)
+end = time.time()
+TOTAL_TIME = end - start
+print(
+    f"Total time: {TOTAL_TIME:.2f} seconds, Time spent on read/write: {TIME_READ_WRITE:.2f} seconds"
+)
