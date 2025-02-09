@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from cnn_network import Net  # Import the core network architecture
+from Network.homography_model import Net  # Import the core network architecture
 
 
 class UnsupervisedHomographyNet(pl.LightningModule):
@@ -33,9 +33,7 @@ class UnsupervisedHomographyNet(pl.LightningModule):
         """
         super(UnsupervisedHomographyNet, self).__init__()
         self.save_hyperparameters(hparams)
-        input_size = hparams.get('InputSize', 128)  # Default value if not provided
-        output_size = hparams.get('OutputSize', 8)  # Default value if not provided
-        self.model = Net(input_size, output_size)
+        self.model = Net(hparams)
         self.lr = hparams.get('lr', 0.001)  # Default learning rate if not provided
 
         # Define the localization network for the Spatial Transformer Network (STN)
@@ -54,12 +52,9 @@ class UnsupervisedHomographyNet(pl.LightningModule):
             nn.ReLU(True),
             nn.Linear(32, 3 * 2),
         )
-
-        # Initialize the weights/bias with identity transformation
-        self.fc_loc[2].weight.data.zero_()
-        self.fc_loc[2].bias.data.copy_(
-            torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float)
-        )
+        
+        # Initialize a list to store validation outputs
+        self.validation_outputs = []
 
     def stn(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -131,7 +126,7 @@ class UnsupervisedHomographyNet(pl.LightningModule):
             torch.Tensor: The loss value.
         """
         # Unpack the batch
-        img1, img2 = batch
+        img1, img2, batch_pset, batch_img, batch_corners = batch
         # Perform the forward pass to get the predicted homography
         h_pred = self.forward(img1, img2)
         # Compute the loss
@@ -152,30 +147,27 @@ class UnsupervisedHomographyNet(pl.LightningModule):
             dict: A dictionary containing the loss value.
         """
         # Unpack the batch
-        img1, img2 = batch
+        img1, img2, batch_pset, batch_img, batch_corners = batch
         # Perform the forward pass to get the predicted homography
         h_pred = self.forward(img1, img2)
         # Compute the loss
         loss = self.compute_loss(img1, img2, h_pred)
         # Log the validation loss
         self.log("val_loss", loss)
+        # Store the validation loss in the outputs list
+        self.validation_outputs.append({"val_loss": loss})
         return loss
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         """
         Aggregate the validation results at the end of an epoch.
-
-        Args:
-            outputs (list): A list of dictionaries containing the loss for each batch.
-
-        Returns:
-            dict: A dictionary containing the average loss for the epoch.
         """
         # Calculate the average validation loss
-        avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
+        avg_loss = torch.stack([x["val_loss"] for x in self.validation_outputs]).mean()
         # Log the average validation loss
-        self.log("val_loss", avg_loss)
-        return {"avg_val_loss": avg_loss}
+        self.log("avg_val_loss", avg_loss)
+        # Clear the validation outputs list
+        self.validation_outputs.clear()
 
     def configure_optimizers(self):
         """

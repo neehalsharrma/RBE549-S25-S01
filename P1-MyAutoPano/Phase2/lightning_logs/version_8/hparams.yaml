@@ -1,0 +1,5 @@
+InputSize: 128
+OutputSize: 8
+batch_size: 64
+lr: 0.001
+num_epochs: 50
