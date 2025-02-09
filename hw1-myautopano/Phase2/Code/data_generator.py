@@ -24,16 +24,16 @@ args = parser.parse_args()
 
 if args.train:
     # For training
-    relative_path = "hw1-myautopano\Phase2\Data\Train\\"
-    label_file_name = "..\..\Code\TxtFiles\TrainLabels.csv"
-    PA_paths = "..\..\Code\TxtFiles\DirNamesTrainPA.txt"
-    PB_paths = "..\..\Code\TxtFiles\DirNamesTrainPB.txt"
+    relative_path = os.path.join("hw1-myautopano", "Phase2", "Data", "Train", "")
+    label_file_name = os.path.join("..", "..", "Code", "TxtFiles", "TrainLabels.csv")
+    PA_paths = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTrainPA.txt")
+    PB_paths = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTrainPB.txt")
 elif args.test:
     # For testing
-    relative_path = "hw1-myautopano\Phase2\Data\Val\\"
-    label_file_name = "..\..\Code\TxtFiles\TestLabels.csv"
-    PA_paths = "..\..\Code\TxtFiles\DirNamesTestPA.txt"
-    PB_paths = "..\..\Code\TxtFiles\DirNamesTestPB.txt"
+    relative_path = os.path.join("hw1-myautopano", "Phase2", "Data", "Val", "")
+    label_file_name = os.path.join("..", "..", "Code", "TxtFiles", "TestLabels.csv")
+    PA_paths = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTestPA.txt")
+    PB_paths = os.path.join("..", "..", "Code", "TxtFiles", "DirNamesTestPB.txt")
 else:
     raise ValueError("Please specify either --train or --test")
 
@@ -41,19 +41,24 @@ time_read_write = 0
 total_time = 0
 
 def setup(relative_path):
-    if not os.path.exists(relative_path+"PA"):
-        os.makedirs(relative_path+"PA")
-    if not os.path.exists(relative_path+"PB"):
-        os.makedirs(relative_path+"PB")
+    if not os.path.exists(os.path.join(relative_path,"PA")):
+        os.makedirs(os.path.join(relative_path,"PA"))
+        print("Created PA directory", os.path.join(relative_path,"PA"))
+    if not os.path.exists(os.path.join(relative_path,"PB")):
+        os.makedirs(os.path.join(relative_path,"PB"))
+        print("Created PB directory", os.path.join(relative_path,"PB"))
 
 def getListImages(image_path):
+    print("Looking for images in -", image_path)
     image_directory = os.path.dirname(image_path)
 
     # List all files in the directory
     all_files = os.listdir(image_directory)
+    print("Total files found- ", len(all_files))
     # Filter out the image files (assuming they are .jpg files)
     image_files = [f for f in all_files if f.endswith(".jpg")]
     sorted_files = sorted(image_files, key=lambda x: int(re.search(r'\d+', x).group()))
+    print("Total image files found- ", len(sorted_files))
     return sorted_files
 
 def getBatch(image_list, batchNum, size):
@@ -118,8 +123,8 @@ def getRandomPatches(img, p, patch_size, iname, patches_per_image):
         # cv2.imshow("Pb", Pb)
         # cv2.waitKey()
         # cv2.destroyAllWindows()
-        fileA= str(relative_path+"PA\\"+iname +"_"+str(i+1)+ "A.jpg")
-        fileB= str(relative_path+"PB\\"+iname +"_"+str(i+1)+ "B.jpg")
+        fileA= str(os.path.join(relative_path,os.path.join("PA",iname +"_"+str(i+1)+ "A.jpg")))
+        fileB= str(os.path.join(relative_path,os.path.join("PB",iname +"_"+str(i+1)+ "B.jpg")))
         fileA_paths.append(fileA)
         fileB_paths.append(fileB)
         saveRandomPatches(Pa, Pb, fileA, fileB)
@@ -151,12 +156,12 @@ def generate_images_batch(p, batch_images, batch_num, batch_size, patch_size, pa
 
 def save_labels_to_file(data, filename):
     """Saves a list of lists to a text file with line breaks and comma-separated values."""
-    with open(filename, "a") as file:
+    with open(filename, "w") as file:
         for line in data:
             file.write(",".join(map(str, line)) + "\n")
 
 def save_image_list_to_file(data, filename):
-    with open(filename, "a") as file:
+    with open(filename, "w") as file:
         for line in data:
             file.write(line + "\n")
 
@@ -192,7 +197,8 @@ def generate_images(p, relative_path, batch_size, patch_size, patches_per_image)
     fileB_list=[]
     
     iterations = (len(image_list) + batch_size - 1) // batch_size  # Ceiling division
-    
+    print("Total iterations: ", iterations)
+
     def process_batch(i):
         """Function to process a single batch"""
         print("On batch- ", i)
@@ -211,9 +217,9 @@ def generate_images(p, relative_path, batch_size, patch_size, patches_per_image)
         fileA_list.extend(result[1])
         fileB_list.extend(result[2])
 
-    save_image_list_to_file(fileA_list, relative_path + PA_paths)
-    save_image_list_to_file(fileB_list, relative_path + PB_paths)
-    save_labels_to_file(transformation_list, relative_path + label_file_name)
+    save_image_list_to_file(fileA_list, os.path.join(relative_path, PA_paths))
+    save_image_list_to_file(fileB_list, os.path.join(relative_path, PB_paths))
+    save_labels_to_file(transformation_list, os.path.join(relative_path, label_file_name))
 
 
 start= time.time()

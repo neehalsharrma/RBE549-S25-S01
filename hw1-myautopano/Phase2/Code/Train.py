@@ -51,6 +51,7 @@ from tqdm import tqdm
 from Network.CNN_Network import Net
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+print("     ###     DEVICE- ", device)
 # Save file names in dictionary and then directly read and populate through setup
 # Then just get randx path
 def GenerateBatch(BasePath, DirNamesTrainPA, DirNamesTrainPB,TrainCoordinates, ImageSize, MiniBatchSize):
@@ -125,6 +126,16 @@ def evaluate(model,BasePath, DirNamesTestPA, DirNamesTestPB,TestCoordinates, Ima
     
     return model.validation_epoch_end(outputs)
 
+def save_loss_data(data, filename):
+    with open(filename, "a") as file:
+        file.write(",".join(map(str, data)) + "\n")
+    print("Loss data saved to ", filename)
+        
+
+def open_new_file(filename):
+    with open(filename, "w") as file:
+        file.write("train_loss, test_loss, epoch\n")
+    print("Created new file ", filename)
 
 def TrainOperation(
     DirNamesTrainPA,
@@ -185,7 +196,7 @@ def TrainOperation(
         loss_log_capture=[]
 
     if LatestFile is not None:
-        CheckPoint = torch.load(CheckPointPath + LatestFile + ".ckpt")
+        CheckPoint = torch.load(LatestFile)
         # Extract only numbers from the name
         StartEpoch = int("".join(c for c in LatestFile.split("a")[0] if c.isdigit()))
         model.load_state_dict(CheckPoint["model_state_dict"])
@@ -271,8 +282,7 @@ def TrainOperation(
         )
         print("\n" + SaveName + " Model Saved...")
 
-    loss_log = pd.DataFrame(loss_log_capture)
-    loss_log.to_csv("loss_log.csv", index=False)
+        save_loss_data([result["train_loss"], result["test_loss"], Epochs+1], "loss_log.csv")
 
 
 def main():
@@ -330,6 +340,8 @@ def main():
         help="Path to save Logs for Tensorboard, Default=Logs/",
     )
 
+    
+
     Args = Parser.parse_args()
     NumEpochs = Args.NumEpochs
     BasePath = Args.BasePath
@@ -359,6 +371,7 @@ def main():
         LatestFile = FindLatestModel(CheckPointPath)
     else:
         LatestFile = None
+        open_new_file("loss_log.csv")
 
     # Pretty print stats
     PrettyPrint(NumEpochs, DivTrain, MiniBatchSize, NumTrainSamples, LatestFile)

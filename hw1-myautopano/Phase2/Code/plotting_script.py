@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 file_path = "loss_log.csv"
 df = pd.read_csv(file_path)
 
+print(df.columns)
+print(df.head())
+df.columns = df.columns.str.strip()
+
+
 # Extract columns
 epochs = df["epoch"]
 test_loss = df["test_loss"]

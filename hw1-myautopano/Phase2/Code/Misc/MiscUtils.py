@@ -57,13 +57,23 @@ def remap(x, oMin, oMax, iMin, iMax):
 
 
 def FindLatestModel(CheckPointPath):
-    FileList = glob.glob(
-        CheckPointPath + "*.ckpt.index"
-    )  # * means all if need specific format then *.csv
+    # FileList = glob.glob(
+    #     CheckPointPath + "*.ckpt"
+    # )  # * means all if need specific format then *.csv
+    # print("Found ", len(FileList), " files")
+    # LatestFile = max(FileList, key=os.path.getctime)
+    # # Strip everything else except needed information
+    # LatestFile = LatestFile.replace(CheckPointPath, "")
+    # LatestFile = LatestFile.replace(".ckpt.index", "")
+    # return LatestFile
+    FileList = glob.glob(CheckPointPath + '*.ckpt') # * means all if need specific format then *.csv
+    print("total files- ", len(FileList))
     LatestFile = max(FileList, key=os.path.getctime)
     # Strip everything else except needed information
-    LatestFile = LatestFile.replace(CheckPointPath, "")
-    LatestFile = LatestFile.replace(".ckpt.index", "")
+    # print(LatestFile, " #### ", CheckPointPath)
+    # LatestFile = LatestFile.replace(CheckPointPath, '')
+    # LatestFile = LatestFile.replace('.ckpt', '')
+    print("Latest File- ", LatestFile)
     return LatestFile
 
 
