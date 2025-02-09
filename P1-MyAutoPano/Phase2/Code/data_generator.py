@@ -250,7 +250,7 @@ def get_random_patches(
                 [w1 + pw2, h4 + ph2],
                 [w4 + pw3, h1 + ph3],
                 [w4 + pw4, h4 + ph4],
-            ]
+            ], dtype=np.float32
         )
 
         hab = cv2.getPerspectiveTransform(coords_a, coords_b)  # Get perspective transform matrix
