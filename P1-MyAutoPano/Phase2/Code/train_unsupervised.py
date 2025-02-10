@@ -13,14 +13,6 @@ from custom_image_dataset import CustomImageDataset  # Import the custom dataset
 from Network.homography_model import Net  # Import the Net from homography_model
 import argparse  # Import argparse for command-line arguments
 
-class Net(pl.LightningModule):
-    # ...existing code...
-
-    def validation_step(self, batch, batch_idx):
-        # ...existing code...
-        self.log('val_loss', val_loss, sync_dist=True)  # Update logging for distributed setting
-        # ...existing code...
-
 def main():
     # Set random seed for reproducibility
     pl.seed_everything(42)

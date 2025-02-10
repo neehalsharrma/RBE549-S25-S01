@@ -150,7 +150,7 @@ class Net(pl.LightningModule):
         # Compute the loss
         loss = loss_fn(patch_b_pred, batch_patch_b.to(self.device))['loss']
         # Log the validation loss
-        self.log("val_loss", loss)
+        self.log('val_loss', loss, sync_dist=True)  # Distributed setting
         return {"val_loss": loss}
 
     def configure_optimizers(self):
