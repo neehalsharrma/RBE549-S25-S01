@@ -126,7 +126,7 @@ class UnsupervisedHomographyNet(pl.LightningModule):
             torch.Tensor: The loss value.
         """
         # Unpack the batch
-        img1, img2, batch_pset, batch_img, batch_corners = batch
+        img1, img2, batch_patch_b = batch
         # Perform the forward pass to get the predicted homography
         h_pred = self.forward(img1, img2)
         # Compute the loss
@@ -147,7 +147,7 @@ class UnsupervisedHomographyNet(pl.LightningModule):
             dict: A dictionary containing the loss value.
         """
         # Unpack the batch
-        img1, img2, batch_pset, batch_img, batch_corners = batch
+        img1, img2, batch_patch_b = batch
         # Perform the forward pass to get the predicted homography
         h_pred = self.forward(img1, img2)
         # Compute the loss

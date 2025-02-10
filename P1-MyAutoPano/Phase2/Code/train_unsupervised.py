@@ -11,18 +11,34 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from custom_image_dataset import CustomImageDataset  # Import the custom dataset
 from Network.homography_model import Net  # Import the Net from homography_model
+import argparse  # Import argparse for command-line arguments
+
+class Net(pl.LightningModule):
+    # ...existing code...
+
+    def validation_step(self, batch, batch_idx):
+        # ...existing code...
+        self.log('val_loss', val_loss, sync_dist=True)  # Update logging for distributed setting
+        # ...existing code...
 
 def main():
     # Set random seed for reproducibility
     pl.seed_everything(42)
 
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Train the unsupervised HomographyNet.')
+    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+    parser.add_argument('--num_epochs', type=int, default=50, help='Number of epochs')
+    args = parser.parse_args()
+
     # Define hyperparameters
     hparams = {
         'InputSize': 128,
         'OutputSize': 8,
-        'lr': 0.001,
-        'batch_size': 64,
-        'num_epochs': 50,
+        'lr': args.lr,
+        'batch_size': args.batch_size,
+        'num_epochs': args.num_epochs,
     }
 
     # Initialize the model
