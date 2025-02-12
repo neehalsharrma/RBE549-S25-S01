@@ -1,5 +1,6 @@
 # Ignoring data file
 P1-MyAutoPano/Phase2/Data/
+HW1-MyAutoCalib/Data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
