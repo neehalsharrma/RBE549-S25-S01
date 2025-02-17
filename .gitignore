@@ -1,6 +1,8 @@
 # Ignoring data file
 P1-MyAutoPano/Phase2/Data/
 HW1-MyAutoCalib/Data/
+.vscode
+*:Zone.Identifier
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
