@@ -3,13 +3,25 @@ import cv2
 import matplotlib.pyplot as plt
 
 
-def load_data(img: int, data_path: str = '../P2Data/', num_images: int = 5) -> tuple[int, np.ndarray, np.ndarray]:
+def load_image(img: int, data_path: str = '../P2Data/') -> np.ndarray:
+    """
+    Load the image from the given path and return the image as a NumPy array.
+    @ data_path: The path to the data.
+    @ img: The image to load.
+    @ return: The image as a NumPy array.
+    """
+    img_path = data_path + str(img) + '.png'
+    img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return img
+
+def load_data_full(img: int, data_path: str = '../P2Data/', num_images: int = 5) -> tuple[int, np.ndarray]:
     """
     Load the data from the given path and return the data as a tuple.
     @ data_path: The path to the data.
     @ img: The image to load.
     @ num_images: The number of images to be used in the SfM matching
-    @ return: A tuple containing the number of matches, the data from the file, and a list containing the images.
+    @ return: A tuple containing the number of matches, the data from the file.
     Format for matches:
     Each Row: (the number of matches for the jth feature)
               (Red Value) (Green Value) (Blue Value)
@@ -31,14 +43,46 @@ def load_data(img: int, data_path: str = '../P2Data/', num_images: int = 5) -> t
             values = list(map(float, line.split()))
             matches[i, :len(values)] = np.array(values)
 
-    img_path = data_path + str(img) + '.png'
+    # img_path = data_path + str(img) + '.png'
+    #
+    # # Load the images
+    # img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+    #
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    #
+    return n_features, matches
 
-    # Load the images
-    img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
 
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+def load_correspondences(image1: int,image2:int, data_path: str = '../P2Data/', num_images:int = 5) -> np.ndarray:
+    """
+    Load the correspondences between two images from the given path and return the data as a NumPy array.
+    @ data_path: The path to the data.
+    @ image1: The first image for correspondences.
+    @ image2: The second image for correspondences.
+    @ return: The correspondences as a a num_correspondences x 4 array.
+    """
 
-    return n_features, matches, img
+    matching_file = data_path + 'matching' + str(image1) + '.txt'
+    header_data = 6
+    _, matches = load_data_full(image1, data_path, num_images)
+    with open(matching_file, 'r') as file:
+        lines = file.readlines()
+        # Extract the number of features
+        n_features = int(lines[0].split(":")[1].strip())
+        num_lines = len(lines) - 1
+        # Process the feature data into a NumPy array
+        correspondences = np.ndarray((0, 4), dtype=np.float32)
+        for i in range(len(matches)):
+            x1, y1 = matches[i, 4:6]
+            num_matches = int(matches[i, 0])
+            for j in range(num_matches - 1):
+                img_id = int(matches[i, header_data + j * 3])
+                if img_id != image2:
+                    continue
+                x2, y2 = matches[i, (header_data + 1) + j * 3:9 + j * 3]
+                correspondences = np.append(correspondences, np.array([[x1, y1, x2, y2]]), axis=0)
+                break
+    return correspondences
 
 
 def show_features(points, img1):
@@ -54,8 +98,9 @@ def show_features(points, img1):
 
 
 def show_matches(image1: int, image2: int, data_path: str = '../P2Data/'):
-    n_features_one, matches_one, img1 = load_data(image1)
-    n_features_two, matches_two, img2 = load_data(image2)
+    n_features_one, matches_one = load_data_full(image1)
+    img1 = load_image(image1)
+    img2 = load_image(image2)
     spacer = 6  # The number of columns in the matches array
     img = np.concatenate((img1, img2), axis=1)
     for i in range(len(matches_one)):
@@ -65,9 +110,7 @@ def show_matches(image1: int, image2: int, data_path: str = '../P2Data/'):
             img_id = int(matches_one[i, spacer + j * 3])
             if img_id != image2:
                 continue
-            x2, y2 = matches_one[i, 7 + j * 3:9 + j * 3]
-
-
+            x2, y2 = matches_one[i, (spacer + 1) + j * 3:9 + j * 3]
             cv2.circle(img, (int(x1), int(y1)), 3, (0, 0, 255), 2)
             cv2.circle(img, (int(x2) + img1.shape[1], int(y2)), 3, (0, 0, 255), 2)
             cv2.line(img, (int(x1), int(y1)), (int(x2) + img1.shape[1], int(y2)), (255, 0, 0), 2)
