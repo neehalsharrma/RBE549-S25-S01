@@ -3,7 +3,7 @@ import cv2
 import matplotlib.pyplot as plt
 
 
-def load_image(img: int, data_path: str = '../P2Data/') -> np.ndarray:
+def loadImage(img: int, data_path: str = '../P2Data/') -> np.ndarray:
     """
     Load the image from the given path and return the image as a NumPy array.
     @ data_path: The path to the data.
@@ -15,7 +15,23 @@ def load_image(img: int, data_path: str = '../P2Data/') -> np.ndarray:
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
-def load_data_full(img: int, data_path: str = '../P2Data/', num_images: int = 5) -> tuple[int, np.ndarray]:
+def loadCalibrationMatrix(data_path: str = '../P2Data/') -> np.ndarray:
+    """
+    Load the calibration matrix from the given path and return the calibration matrix as a NumPy array.
+    @ data_path: The path to the data.
+    @ return: The calibration matrix as a NumPy array.
+    """
+    calibration_file = data_path + 'calibration.txt'
+    with open(calibration_file, 'r') as file:
+        lines = file.readlines()
+        K = np.zeros((3, 3), dtype=np.float32)
+        for i, line in enumerate(lines):
+            values = list(map(float, line.split()))
+            K[i] = np.array(values)
+    return K
+
+
+def loadDataFull(img: int, data_path: str = '../P2Data/', num_images: int = 5) -> tuple[int, np.ndarray]:
     """
     Load the data from the given path and return the data as a tuple.
     @ data_path: The path to the data.
@@ -53,7 +69,7 @@ def load_data_full(img: int, data_path: str = '../P2Data/', num_images: int = 5)
     return n_features, matches
 
 
-def load_correspondences(image1: int,image2:int, data_path: str = '../P2Data/', num_images:int = 5) -> np.ndarray:
+def loadCorrespondences(image1: int, image2:int, data_path: str = '../P2Data/', num_images:int = 5) -> np.ndarray:
     """
     Load the correspondences between two images from the given path and return the data as a NumPy array.
     @ data_path: The path to the data.
@@ -64,7 +80,7 @@ def load_correspondences(image1: int,image2:int, data_path: str = '../P2Data/', 
 
     matching_file = data_path + 'matching' + str(image1) + '.txt'
     header_data = 6
-    _, matches = load_data_full(image1, data_path, num_images)
+    _, matches = loadDataFull(image1, data_path, num_images)
     with open(matching_file, 'r') as file:
         lines = file.readlines()
         # Extract the number of features
@@ -85,37 +101,31 @@ def load_correspondences(image1: int,image2:int, data_path: str = '../P2Data/', 
     return correspondences
 
 
-def show_features(points, img1):
+def showFeatures(points, img1):
     img1_features = img1.copy()
     for i in range(points.shape[0]):
         y, x = points[i, 4:6]
         cv2.circle(img1_features, (int(x), int(y)), 5, (0, 255, 0), -1)
-
     plt.figure(figsize=(10, 10))
     plt.imshow(img1_features)
     plt.axis('off')
     plt.show()
 
 
-def show_matches(image1: int, image2: int, data_path: str = '../P2Data/'):
-    n_features_one, matches_one = load_data_full(image1)
-    img1 = load_image(image1)
-    img2 = load_image(image2)
-    spacer = 6  # The number of columns in the matches array
+def showMatches(image1: int, image2: int, data_path: str = '../P2Data/'):
+    img1 = loadImage(image1)
+    img2 = loadImage(image2)
     img = np.concatenate((img1, img2), axis=1)
-    for i in range(len(matches_one)):
-        x1, y1 = matches_one[i, 4:6]
-        num_matches = int(matches_one[i, 0])
-        for j in range(num_matches - 1):
-            img_id = int(matches_one[i, spacer + j * 3])
-            if img_id != image2:
-                continue
-            x2, y2 = matches_one[i, (spacer + 1) + j * 3:9 + j * 3]
-            cv2.circle(img, (int(x1), int(y1)), 3, (0, 0, 255), 2)
-            cv2.circle(img, (int(x2) + img1.shape[1], int(y2)), 3, (0, 0, 255), 2)
-            cv2.line(img, (int(x1), int(y1)), (int(x2) + img1.shape[1], int(y2)), (255, 0, 0), 2)
-    plt.figure(figsize=(10, 10))
 
+    correspondences = loadCorrespondences(image1, image2)
+
+    for i in range(correspondences.shape[0]):
+        x1, y1, x2, y2 = correspondences[i]
+        cv2.circle(img, (int(x1), int(y1)), 3, (0, 0, 255), 2)
+        cv2.circle(img, (int(x2) + img1.shape[1], int(y2)), 3, (0, 0, 255), 2)
+        cv2.line(img, (int(x1), int(y1)), (int(x2) + img1.shape[1], int(y2)), (255, 0, 0), 2)
+
+    plt.figure(figsize=(10, 10))
     plt.imshow(img)
     plt.axis('off')
     plt.show()
