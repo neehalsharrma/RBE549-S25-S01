@@ -174,7 +174,7 @@ def showRANSAC(image1: int, image2: int, inliers: np.array, outliers: np.array, 
     img = np.concatenate((img1, img2), axis=1)
     for i in range(inliers.shape[0]):
         # Hide some of the inliers to make the image easier to see
-        if i % 5 == 0:
+        if i % 5 != 0:
             continue
         x1, y1, x2, y2 = inliers[i]
         cv2.circle(img, (int(x1), int(y1)), 5, (0, 0, 255), -1)
@@ -182,6 +182,8 @@ def showRANSAC(image1: int, image2: int, inliers: np.array, outliers: np.array, 
         cv2.line(img, (int(x1), int(y1)), (int(x2) + img1.shape[1], int(y2)), (0, 127, 0), 1)
     if outliers is not None:
         for i in range(outliers.shape[0]):
+            if i % 5 != 0:
+                continue
             x1, y1, x2, y2 = outliers[i]
             cv2.circle(img, (int(x1), int(y1)), 5, (0, 0, 255), -1)
             cv2.circle(img, (int(x2) + img1.shape[1], int(y2)), 5, (0, 0, 255), -1)
