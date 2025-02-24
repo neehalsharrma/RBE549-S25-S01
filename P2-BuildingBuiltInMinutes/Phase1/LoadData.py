@@ -123,9 +123,10 @@ def showMatches(image1: int, image2: int, data_path: str = '../P2Data/'):
         x1, y1, x2, y2 = correspondences[i]
         cv2.circle(img, (int(x1), int(y1)), 3, (0, 0, 255), 2)
         cv2.circle(img, (int(x2) + img1.shape[1], int(y2)), 3, (0, 0, 255), 2)
-        cv2.line(img, (int(x1), int(y1)), (int(x2) + img1.shape[1], int(y2)), (255, 0, 0), 2)
+        cv2.line(img, (int(x1), int(y1)), (int(x2) + img1.shape[1], int(y2)), (127, 0, 0), 1)
 
     plt.figure(figsize=(10, 10))
+    plt.title('Matches between Image ' + str(image1) + ' and Image ' + str(image2))
     plt.imshow(img)
     plt.axis('off')
     plt.show()

@@ -1,8 +1,8 @@
 import numpy as np
+from LoadData import loadCalibrationMatrix
 
 
-
-def estimateE(F, K):
+def estimateE(F, K, calibration_path:str = '../P2Data/') -> np.ndarray:
     E= K.T @ F @ K
 
     # Enforcing Rank 2

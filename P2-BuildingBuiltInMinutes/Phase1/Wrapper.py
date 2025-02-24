@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import LoadData
 from EstimateFundamentalMatrix import estimateF
-from GetInliersRANSAC import RANSAC, showRANSAC
+from GetInliersRANSAC import RANSAC, showRANSAC, cv2RANSAC
 
 if __name__ == '__main__':
     img1 = LoadData.loadImage(1)
@@ -22,6 +22,9 @@ if __name__ == '__main__':
     correspondences = LoadData.loadCorrespondences(1, 2)
     points1 = correspondences[:, 0:2]
     points2 = correspondences[:, 2:4]
-    F_hat, best_inliers = RANSAC(correspondences, num_iterations=3000)
-    showRANSAC(1, 2, best_inliers)
+    _, best_inliers, outliers = RANSAC(correspondences, threshold=2, acc_thresh=0.85)
 
+    showRANSAC(1, 2, best_inliers, outliers)
+
+    _ , best_inliers, outliers = cv2RANSAC(correspondences, threshold=2)
+    showRANSAC(1, 2, best_inliers, outliers, title="OpenCV RANSAC")
