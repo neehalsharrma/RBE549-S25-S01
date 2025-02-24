@@ -8,30 +8,40 @@ from LoadData import loadImage
 import concurrent.futures
 import threading
 
+import numpy as np
 
-def ssdThreshold(points1, points2, threshold, F) -> int:
+
+# Using the Sampson distance to compute the number of inliers based on the algorithm from
+# equation 11.9 in Multiple View Geometry in Computer Vision, Second Edition
+def sampson_dist_Threshold(points1, points2, threshold, F) -> int:
     """
-    Compute the number of inliers given the threshold.
+    Compute the number of inliers given the threshold using Sampson distance.
     @ points1: The points in the first image as an n x 2 array.
     @ points2: The points in the second image as an n x 2 array.
     @ threshold: The threshold to be used.
     @ F: The Fundamental Matrix as 3x3
     """
-    p1 = np.hstack((points1, np.ones((points1.shape[0], 1)))) # n x 3
-    p2 = np.hstack((points2, np.ones((points2.shape[0], 1)))) # n x 3
-    errors = np.abs(np.sum(p2 * (F @ p1.T).T, axis=1))
-    num_inliers = np.sum(errors < threshold)
 
+    p1 = np.hstack((points1, np.ones((points1.shape[0], 1))))  # n x 3
+    p2 = np.hstack((points2, np.ones((points2.shape[0], 1))))  # n x 3
+
+    F_p1 = F @ p1.T  # 3 x n
+    F_p2 = F.T @ p2.T  # 3 x n
+    errors = np.sum(p2 * F_p1.T, axis=1) ** 2 / (F_p1[0] ** 2 + F_p1[1] ** 2 + F_p2[0] ** 2 + F_p2[1] ** 2)
+    num_inliers = np.sum(errors < threshold ** 2)
     return num_inliers
 
 
-def getInliers(points1, points2, threshold, best_F) -> np.array:
-    p1 = np.hstack((points1, np.ones((points1.shape[0], 1))))
-    p2 = np.hstack((points2, np.ones((points2.shape[0], 1))))
-    errors = np.abs(np.sum((best_F @ p1.T).T * p2, axis=1))
+def getInliers(points1, points2, threshold, best_F) -> tuple[np.array, np.array]:
+    p1 = np.hstack((points1, np.ones((points1.shape[0], 1))))  # n x 3
+    p2 = np.hstack((points2, np.ones((points2.shape[0], 1))))  # n x 3
+    F_p1 = best_F @ p1.T  # 3 x n
+    F_p2 = best_F.T @ p2.T  # 3 x n
+    errors = np.sqrt(np.sum(p2 * F_p1.T, axis=1) ** 2 / (F_p1[0] ** 2 + F_p1[1] ** 2 + F_p2[0] ** 2 + F_p2[1] ** 2))
     inliers = np.hstack((points1[errors < threshold], points2[errors < threshold]))
     outliers = np.hstack((points1[errors >= threshold], points2[errors >= threshold]))
     return inliers, outliers
+
 
 # Single Threaded RANSAC written by Nikesh
 # def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh=0.85) -> np.array:
@@ -51,17 +61,18 @@ def getInliers(points1, points2, threshold, best_F) -> np.array:
 #     points2 = correspondences[:, 2:4]
 #     rng = np.random.default_rng()
 #     while best_percent < acc_thresh:
-#         random_samples = rng.choice(a=correspondences,size=8, replace=False, axis=0, shuffle=False)
+#         random_samples = rng.choice(a=correspondences, size=8, replace=False, axis=0, shuffle=False)
 #         samples1 = random_samples[:, 0:2]
 #         samples2 = random_samples[:, 2:4]
 #         F = estimateF(samples1, samples2)
-#         num_inliers = ssdThreshold(points1, points2, threshold, F)
+#         num_inliers = sampson_dist_Threshold(points1, points2, threshold, F)
 #         percent_match = num_inliers / num_features
 #         # if a better match is found, update the best match
 #         if percent_match > best_percent:
 #             best_percent = percent_match
 #             best_inliers, outliers = getInliers(points1, points2, threshold, F)
 #             print(f"Best Percent: {best_percent}")
+#
 #     print(f"Time taken: {time.time() - start_time}")
 #     print(f'Original No. of features: {num_features}')
 #     print(f"No. of inliers: {best_inliers.shape[0]}")
@@ -69,8 +80,8 @@ def getInliers(points1, points2, threshold, best_F) -> np.array:
 #
 #     return F_hat, best_inliers, outliers
 
-# Modified multithreaded RANSAC modified from the previous by ChatGPT
 
+# Modified multithreaded RANSAC modified from the previous by ChatGPT
 def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh = 0.85,
            num_threads: int = 12) -> np.array:
     """
@@ -103,7 +114,7 @@ def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh = 0.85,
             samples1 = random_samples[:, 0:2]
             samples2 = random_samples[:, 2:4]
             F = estimateF(samples1, samples2)
-            num_inliers = ssdThreshold(points1, points2, threshold, F)
+            num_inliers = sampson_dist_Threshold(points1, points2, threshold, F)
             percent_match = num_inliers / num_features
 
             # Check and update best match safely
@@ -127,7 +138,7 @@ def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh = 0.85,
     print(f'Original No. of features: {num_features}')
     print(f"No. of inliers: {best_inliers.shape[0]}")
 
-    # Compute final refined F using best inliers found
+    # Compute final refined F using the best inliers found
     F_hat = estimateF(best_inliers[:, 0:2], best_inliers[:, 2:4])
 
     return F_hat, best_inliers, best_outliers
@@ -144,10 +155,14 @@ def cv2RANSAC(correspondences: np.array, threshold: float = 5):
     inliers2 = pts2[mask.ravel() == 1]
     outliers1 = pts1[mask.ravel() == 0]
     outliers2 = pts2[mask.ravel() == 0]
+    print(f'Original No. of features: {correspondences.shape[0]}')
+    print(f"No. of inliers: {inliers1.shape[0]}")
+
     return fundamental, np.hstack((inliers1, inliers2)), np.hstack((outliers1, outliers2))
 
 
-def showRANSAC(image1: int, image2: int, inliers: np.array, outliers: np.array, save: bool = False, save_path: str = '../Results/', title=None) -> None:
+def showRANSAC(image1: int, image2: int, inliers: np.array, outliers: np.array, save: bool = False,
+               save_path: str = '../Results/', title=None) -> None:
     """
     Display the images with the inliers.
     @ img1: The first image.

@@ -22,7 +22,7 @@ if __name__ == '__main__':
     correspondences = LoadData.loadCorrespondences(1, 2)
     points1 = correspondences[:, 0:2]
     points2 = correspondences[:, 2:4]
-    _, best_inliers, outliers = RANSAC(correspondences, threshold=2, acc_thresh=0.85)
+    _, best_inliers, outliers = RANSAC(correspondences, threshold=6, acc_thresh=0.85)
 
     showRANSAC(1, 2, best_inliers, outliers)
 
