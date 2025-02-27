@@ -2,10 +2,13 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-def extract_camera_pose(essential: np.array) -> tuple[list[np.array, np.array]]:
+def extract_camera_pose(essential: np.array) -> tuple[np.array, np.array]:
     """
     Extract the camera pose from the essential matrix.
     @ essential: The essential matrix.
+    @ return: The camera centers and the rotation matrices.
+    The shape is (4, 3) for the camera centers and (4, 3, 3) for the rotation matrices.
+
     """
     C_out = []
     R_out = []
@@ -27,7 +30,8 @@ def extract_camera_pose(essential: np.array) -> tuple[list[np.array, np.array]]:
             C = -C
         C_out.append(C)
         R_out.append(R)
-
+    C_out = np.array(C_out).reshape(4,3)
+    R_out = np.array(R_out).reshape(4,3,3)
     return C_out, R_out
 
 
