@@ -30,7 +30,7 @@ def loadCalibrationMatrix(data_path: str = '../P2Data/') -> np.ndarray:
             K[i] = np.array(values)
     return K
 
-
+# Loading lines into a NumPy numerical array where each row in file is written as a row of ints in the NumPy array
 def loadDataFull(img: int, data_path: str = '../P2Data/', num_images: int = 5) -> tuple[int, np.ndarray]:
     """
     Load the data from the given path and return the data as a tuple.
@@ -47,13 +47,13 @@ def loadDataFull(img: int, data_path: str = '../P2Data/', num_images: int = 5) -
     """
     # Load the data from the file.
     matching_file = data_path + 'matching' + str(img) + '.txt'
-    header_data = 6
+    header_data = 6  # header_data- (#matches, R, G, B, u, v)
     with open(matching_file, 'r') as file:
         lines = file.readlines()
         # Extract the number of features
         n_features = int(lines[0].split(":")[1].strip())
         num_lines = len(lines) - 1
-        # Process the feature data into a NumPy array
+        # Process the feature data into a NumPy array- (headerData, match1, match2, match3, ..., matchTotalImages); match- (image_id, u, v)
         matches = np.zeros((num_lines, header_data + (num_images - 1) * 3), dtype=np.float32)
         for i, line in enumerate(lines[1:]):
             values = list(map(float, line.split()))
@@ -68,7 +68,7 @@ def loadDataFull(img: int, data_path: str = '../P2Data/', num_images: int = 5) -
     #
     return n_features, matches
 
-
+# Return correspondences between two images- array of (img1_x, img1_y, img2_x, img2_y)
 def loadCorrespondences(image1: int, image2:int, data_path: str = '../P2Data/', num_images:int = 5) -> np.ndarray:
     """
     Load the correspondences between two images from the given path and return the data as a NumPy array.
@@ -81,23 +81,19 @@ def loadCorrespondences(image1: int, image2:int, data_path: str = '../P2Data/', 
     matching_file = data_path + 'matching' + str(image1) + '.txt'
     header_data = 6
     _, matches = loadDataFull(image1, data_path, num_images)
-    with open(matching_file, 'r') as file:
-        lines = file.readlines()
-        # Extract the number of features
-        n_features = int(lines[0].split(":")[1].strip())
-        num_lines = len(lines) - 1
-        # Process the feature data into a NumPy array
-        correspondences = np.ndarray((0, 4), dtype=np.float32)
-        for i in range(len(matches)):
-            x1, y1 = matches[i, 4:6]
-            num_matches = int(matches[i, 0])
-            for j in range(num_matches - 1):
-                img_id = int(matches[i, header_data + j * 3])
-                if img_id != image2:
-                    continue
-                x2, y2 = matches[i, (header_data + 1) + j * 3:9 + j * 3]
-                correspondences = np.append(correspondences, np.array([[x1, y1, x2, y2]]), axis=0)
-                break
+
+    # Process the feature data into a NumPy array correspondences-(img1_x, img1_y, img2_x, img2_y)
+    correspondences = np.ndarray((0, 4), dtype=np.float32)
+    for i in range(len(matches)):
+        x1, y1 = matches[i, 4:6]
+        num_matches = int(matches[i, 0])
+        for j in range(num_matches - 1):
+            img_id = int(matches[i, header_data + j * 3])
+            if img_id != image2:
+                continue
+            x2, y2 = matches[i, (header_data + 1) + j * 3:9 + j * 3]
+            correspondences = np.append(correspondences, np.array([[x1, y1, x2, y2]]), axis=0)
+            break
     return correspondences
 
 
