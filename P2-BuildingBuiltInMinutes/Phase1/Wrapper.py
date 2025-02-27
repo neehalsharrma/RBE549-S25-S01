@@ -6,6 +6,7 @@ import os
 import LoadData
 from EstimateFundamentalMatrix import estimateF, plot_epipolar_lines
 from GetInliersRANSAC import RANSAC, showRANSAC, cv2RANSAC
+from Phase1.GetInliersRANSAC import RANSAC_7pt
 
 if __name__ == '__main__':
     img1 = LoadData.loadImage(1)
@@ -22,12 +23,12 @@ if __name__ == '__main__':
     correspondences = LoadData.loadCorrespondences(1, 2)
     points1 = correspondences[:, 0:2]
     points2 = correspondences[:, 2:4]
-    # F, best_inliers, outliers = RANSAC(correspondences, threshold=6, acc_thresh=0.80)
+    F, best_inliers, outliers = RANSAC_7pt(correspondences, threshold=6, acc_thresh=0.80)
 
     # showRANSAC(1, 2, best_inliers, outliers)
-
-    F, best_inliers, outliers = cv2RANSAC(correspondences, threshold=2)
-    showRANSAC(1, 2, best_inliers, outliers, title="OpenCV RANSAC")
+    #
+    # F, best_inliers, outliers = cv2RANSAC(correspondences, threshold=2)
+    # showRANSAC(1, 2, best_inliers, outliers, title="OpenCV RANSAC")
     random_samples = np.random.default_rng().choice(a=correspondences, size=10, replace=False, axis=0,
                                                     shuffle=False)
     plot_epipolar_lines(F, random_samples[:20, 0:2], random_samples[:20, 2:4], img1, img2)

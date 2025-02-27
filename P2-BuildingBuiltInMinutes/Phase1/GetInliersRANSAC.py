@@ -10,6 +10,8 @@ import threading
 
 import numpy as np
 
+from Phase1.EstimateFundamentalMatrix import estimateF_7pt
+
 
 # Using the Sampson distance to compute the number of inliers based on the algorithm from
 # equation 11.9 in Multiple View Geometry in Computer Vision, Second Edition
@@ -80,6 +82,42 @@ def getInliers(points1, points2, threshold, best_F) -> tuple[np.array, np.array]
 #
 #     return F_hat, best_inliers, outliers
 
+
+def RANSAC_7pt(correspondences: np.array, threshold: float = 5, acc_thresh=0.85) -> np.array:
+    """
+    RANSAC Algorithm to find the best set of inliers.
+    @ correspondences: The correspondences between the two images, np.array of shape (n, 4).
+    @ threshold: The threshold to be used for determining inliers.
+    @ acc_thresh: The threshold for the percentage of inliers to stop the algorithm.
+    @ return: The best Fundamental Matrix and the best inliers.
+    """
+    start_time = time.time()
+    num_features = correspondences.shape[0]
+    best_percent = 0
+    best_inliers = None
+    outliers = None
+    points1 = correspondences[:, 0:2]
+    points2 = correspondences[:, 2:4]
+    rng = np.random.default_rng()
+    while best_percent < acc_thresh:
+        random_samples = rng.choice(a=correspondences, size=7, replace=False, axis=0, shuffle=False)
+        samples1 = random_samples[:, 0:2]
+        samples2 = random_samples[:, 2:4]
+        F = estimateF_7pt(samples1, samples2)
+        for i in range(F.shape[2]):
+            num_inliers = sampson_dist_Threshold(points1, points2, threshold, F[:, :, i])
+            percent_match = num_inliers / num_features
+            # if a better match is found, update the best match
+            if percent_match > best_percent:
+                best_percent = percent_match
+                best_inliers, outliers = getInliers(points1, points2, threshold, F[:, :, i])
+                print(f"Best Percent: {best_percent}")
+    print(f"Time taken: {time.time() - start_time}")
+    print(f'Original No. of features: {num_features}')
+    print(f"No. of inliers: {best_inliers.shape[0]}")
+    F_hat = estimateF(best_inliers[:, 0:2], best_inliers[:, 2:4])
+
+    return F_hat, best_inliers, outliers
 
 # Modified multithreaded RANSAC modified from the previous by ChatGPT
 def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh=0.85,

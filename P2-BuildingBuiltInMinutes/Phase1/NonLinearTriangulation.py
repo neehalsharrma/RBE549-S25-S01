@@ -1,0 +1,73 @@
+import numpy as np
+import scipy.optimize.least_squares as least_squares
+
+
+def calc_loss(x: np.array, P: np.array, X: np.array) -> float:
+    """
+    Calculate the loss for the non-linear triangulation.
+    @ x: The 2D points from the image in the shape of (n, 3) since it's homogenized
+    @ P: The projection matrix in the shape of (3, 4)
+    @ X: The 3D points in the shape of (n, 3)
+    """
+    x_hat = P.T @ X
+    x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
+    error = x - x_hat
+    return np.sum(np.power(error[:2], 2))
+
+
+def loss_func(linear_X: np.array, x1: np.array, x2: np.array, P1: np.array, P2: np.array) -> float:
+    """
+    Perform non-linear triangulation to estimate the 3D points.
+    @ linear_X: The linear estimate of the 3D points in the shape of (1, 4)
+    @ x1: The 2D points from the first image in the shape of (1, 3)
+    @ x2: The 2D points from the second image in the shape of (1, 3)
+    @ P1: The projection matrix for the first camera. This is assumed to be P = [I | 0] --> 3x4 matrix.
+    @ P2: The projection matrix for the second camera calculated from the Essential Matrix. --> 3x4 matrix.
+    """
+    error1 = calc_loss(x1, P1, linear_X)
+    error2 = calc_loss(x2, P2, linear_X)
+    return error1 + error2
+
+
+def non_linear_triangulation(K: np.array, C1: np.array, R1: np.array, C2: np.array, R2: np.array, x1: np.array,
+                             x2: np.array, linear_X: np.array) -> tuple[np.array, list[float]]:
+    """
+    Perform non-linear triangulation to estimate the 3D points.
+    We assume that the pose of camera one is [I | 0] as a 3x4 matrix.
+    The pose of camera two is [R | t] as a 3x4 matrix.
+
+    @ K: The intrinsic camera matrix in the shape of (3, 3)
+    @ C1: The center of the first camera in the shape of (3, 1)
+    @ R1: The rotation matrix of the first camera in the shape of (3, 3)
+    @ C2: The center of the second camera in the shape of (3, 1)
+    @ R2: The rotation matrix of the second camera in the shape of (3, 3)
+    @ x1: The 2D points from the first image in the shape of (n, 2)
+    @ x2: The 2D points from the second image in the shape of (n, 2)
+    @ linear_X: The linear estimate of the 3D points in the shape of (n, 3)
+    @ return: The refined estimated 3D points in the shape of (n, 3)
+    """
+    # Create the pose matrices for the cameras
+    P1 = K @ R1 @ np.hstack((np.eye(3), -C1.reshape(3, 1)))  # 3x4 matrix for camera 1 pose
+    P2 = K @ R2 @ np.hstack((np.eye(3), -C2.reshape(3, 1)))  # 3x4 matrix for camera 2 pose
+
+    num_features = x1.shape[0]
+    refined_X = []
+    costs = []
+    # Homogenize the linear X points to be an (n, 4) matrix
+    # This is faster to do in a large batch rather than per loop iteration
+    homogenized_X = np.hstack((linear_X, np.ones((num_features, 1))))
+    # Homogenize the 2D points to be an (n, 3) matrix
+    x1 = np.hstack((x1, np.ones((num_features, 1))))
+    x2 = np.hstack((x2, np.ones((num_features, 1))))
+
+    for i in range(num_features):
+        point1 = x1[i, :]
+        point2 = x2[i, :]
+        x0 = homogenized_X[i, :]
+        optimized = least_squares(loss_func, x0, method='lm', args=(point1, point2, P1, P2))
+        # ignore the homogenization point
+        refined_X.append(optimized.x[:3])
+        costs.append(optimized.cost)
+    refined_X = np.array(refined_X).reshape(num_features, 3)
+
+    return refined_X, costs
