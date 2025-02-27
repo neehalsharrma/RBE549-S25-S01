@@ -82,7 +82,7 @@ def getInliers(points1, points2, threshold, best_F) -> tuple[np.array, np.array]
 
 
 # Modified multithreaded RANSAC modified from the previous by ChatGPT
-def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh = 0.85,
+def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh=0.85,
            num_threads: int = 12) -> np.array:
     """
     Multithreaded RANSAC Algorithm that stops all threads when a good enough model is found.
@@ -105,12 +105,13 @@ def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh = 0.85,
     points1 = correspondences[:, :2]
     points2 = correspondences[:, 2:]
     rng = np.random.default_rng()
+
     def ransac_iteration():
         nonlocal best_percent, best_inliers, best_outliers
 
         while not stop_event.is_set():
             random_samples = rng.choice(a=correspondences, size=8, replace=False, axis=0,
-                                                            shuffle=False)
+                                        shuffle=False)
             samples1 = random_samples[:, 0:2]
             samples2 = random_samples[:, 2:4]
             F = estimateF(samples1, samples2)
@@ -142,6 +143,7 @@ def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh = 0.85,
     F_hat = estimateF(best_inliers[:, 0:2], best_inliers[:, 2:4])
 
     return F_hat, best_inliers, best_outliers
+
 
 def cv2RANSAC(correspondences: np.array, threshold: float = 5):
     """

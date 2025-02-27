@@ -61,6 +61,7 @@ def estimateF(points1, points2):
     F = T2.T @ F @ T1
     return F
 
+
 def estimate_epipole(F):
     '''
        Inputs:
@@ -74,6 +75,7 @@ def estimate_epipole(F):
     e = V[-1, :]
     e /= e[-1]
     return e
+
 
 def plot_epipolar_lines(F, points1, points2, img1, img2):
     """
