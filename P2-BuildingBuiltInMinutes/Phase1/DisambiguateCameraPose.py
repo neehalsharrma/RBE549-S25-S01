@@ -30,10 +30,10 @@ def getCorrectPose(K, C_out: np.array, R_out: np.array, points1: np.array, point
         R = R_out[i, :, :]
         r3 = R[-1, :].reshape(3, 1)  # shape (3, 1)
         # World points based on the camera pose
-        x_set = linearTriangulation2(K, R1, C1, R, C, points1, points2)
+        x_set = linearTriangulation2(K, R1, C1, R, C, points1, points2) # shape (n, 4)
         triangulated_set = []
         for j in range(x_set.shape[0]):
-            X = x_set[j, :].reshape(3, 1)  # shape (3, 1)
+            X = x_set[j, :3].reshape(3, 1)  # shape (3, 1)
             if np.dot(r3.T, (X - C)) > 0:
                 count += 1
                 triangulated_set.append(j)

@@ -29,7 +29,7 @@ def extract_camera_pose(essential: np.array) -> tuple[np.array, np.array]:
         if np.linalg.det(R) < 0:
             R = -R
             C = -C
-        C_out.append(C.T)
+        C_out.append(C)
         R_out.append(R)
     C_out = np.array(C_out).reshape(4,3)
     R_out = np.array(R_out).reshape(4,3,3)

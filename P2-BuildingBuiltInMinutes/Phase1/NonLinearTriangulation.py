@@ -10,7 +10,7 @@ def calc_loss(x: np.array, P: np.array, X: np.array) -> float:
     @ X: The 3D points in the shape of (n, 3)
     @ return The loss for the non-linear triangulation, the shape is a (1, 3) vector.
     """
-    x_hat = P @ X
+    x_hat = P @ X.T
     x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
     error = x - x_hat
     return np.linalg.norm(error)
@@ -44,19 +44,16 @@ def non_linear_triangulation(K: np.array, R1: np.array, C1: np.array, R2: np.arr
     @ R2: The rotation matrix of the second camera in the shape of (3, 3)
     @ x1: The 2D points from the first image in the shape of (n, 2)
     @ x2: The 2D points from the second image in the shape of (n, 2)
-    @ linear_X: The linear estimate of the 3D points in the shape of (n, 3)
-    @ return: The refined estimated 3D points in the shape of (n, 3)
+    @ linear_X: The linear estimate of the 3D points in the shape of (n, 4)
+    @ return: The refined estimated 3D points in the shape of (n, 4)
     """
     # Create the pose matrices for the cameras
-    P1 = K @ R1 @ np.hstack((np.eye(3), -C1.reshape(3, 1)))  # 3x4 matrix for camera 1 pose
-    P2 = K @ R2 @ np.hstack((np.eye(3), -C2.reshape(3, 1)))  # 3x4 matrix for camera 2 pose
+    P1 = K @ R1 @ np.hstack((np.eye(3), -C1))  # 3x4 matrix for camera 1 pose
+    P2 = K @ R2 @ np.hstack((np.eye(3), -C2))  # 3x4 matrix for camera 2 pose
 
     num_features = x1.shape[0]
     refined_X = []
     costs = []
-    # Homogenize the linear X points to be an (n, 4) matrix
-    # This is faster to do in a large batch rather than per loop iteration
-    homogenized_X = np.hstack((linear_X, np.ones((num_features, 1))))
     # Homogenize the 2D points to be an (n, 3) matrix
     x1 = np.hstack((x1, np.ones((num_features, 1))))
     x2 = np.hstack((x2, np.ones((num_features, 1))))
@@ -64,7 +61,7 @@ def non_linear_triangulation(K: np.array, R1: np.array, C1: np.array, R2: np.arr
     for i in range(num_features):
         point1 = x1[i, :]
         point2 = x2[i, :]
-        x0 = homogenized_X[i, :]
+        x0 = linear_X[i, :]
         optimized = scipy.optimize.least_squares(loss_func, x0, args=(point1, point2, P1, P2))
         # ignore the homogenization point
         refined_X.append(optimized.x)
@@ -73,5 +70,5 @@ def non_linear_triangulation(K: np.array, R1: np.array, C1: np.array, R2: np.arr
             print(f"Processed {i} points")
     refined_X = np.array(refined_X).reshape(num_features, 4)
     refined_X = refined_X / refined_X[:, 3].reshape(num_features, 1)
-    refined_X = refined_X[:, :3].reshape(num_features, 3)
+    refined_X = refined_X.reshape(num_features, 4)
     return refined_X, costs
