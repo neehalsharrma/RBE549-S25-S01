@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.optimize.least_squares as least_squares
+import scipy
 
 
 def calc_loss(x: np.array, P: np.array, X: np.array) -> float:
@@ -8,11 +8,12 @@ def calc_loss(x: np.array, P: np.array, X: np.array) -> float:
     @ x: The 2D points from the image in the shape of (n, 3) since it's homogenized
     @ P: The projection matrix in the shape of (3, 4)
     @ X: The 3D points in the shape of (n, 3)
+    @ return The loss for the non-linear triangulation, the shape is a (1, 3) vector.
     """
-    x_hat = P.T @ X
+    x_hat = P @ X
     x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
     error = x - x_hat
-    return np.sum(np.power(error[:2], 2))
+    return np.linalg.norm(error)
 
 
 def loss_func(linear_X: np.array, x1: np.array, x2: np.array, P1: np.array, P2: np.array) -> float:
@@ -29,7 +30,7 @@ def loss_func(linear_X: np.array, x1: np.array, x2: np.array, P1: np.array, P2: 
     return error1 + error2
 
 
-def non_linear_triangulation(K: np.array, C1: np.array, R1: np.array, C2: np.array, R2: np.array, x1: np.array,
+def non_linear_triangulation(K: np.array, R1: np.array, C1: np.array, R2: np.array, C2: np.array, x1: np.array,
                              x2: np.array, linear_X: np.array) -> tuple[np.array, list[float]]:
     """
     Perform non-linear triangulation to estimate the 3D points.
@@ -64,10 +65,13 @@ def non_linear_triangulation(K: np.array, C1: np.array, R1: np.array, C2: np.arr
         point1 = x1[i, :]
         point2 = x2[i, :]
         x0 = homogenized_X[i, :]
-        optimized = least_squares(loss_func, x0, method='lm', args=(point1, point2, P1, P2))
+        optimized = scipy.optimize.least_squares(loss_func, x0, args=(point1, point2, P1, P2))
         # ignore the homogenization point
-        refined_X.append(optimized.x[:3])
+        refined_X.append(optimized.x)
         costs.append(optimized.cost)
-    refined_X = np.array(refined_X).reshape(num_features, 3)
-
+        if i % 100 == 0:
+            print(f"Processed {i} points")
+    refined_X = np.array(refined_X).reshape(num_features, 4)
+    refined_X = refined_X / refined_X[:, 3].reshape(num_features, 1)
+    refined_X = refined_X[:, :3].reshape(num_features, 3)
     return refined_X, costs

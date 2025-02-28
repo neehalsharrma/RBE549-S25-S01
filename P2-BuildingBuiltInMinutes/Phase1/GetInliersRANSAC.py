@@ -3,15 +3,10 @@ import time
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from EstimateFundamentalMatrix import estimateF
+from EstimateFundamentalMatrix import estimateF, estimateF_7pt
 from LoadData import loadImage
 import concurrent.futures
 import threading
-
-import numpy as np
-
-from Phase1.EstimateFundamentalMatrix import estimateF_7pt
-
 
 # Using the Sampson distance to compute the number of inliers based on the algorithm from
 # equation 11.9 in Multiple View Geometry in Computer Vision, Second Edition
