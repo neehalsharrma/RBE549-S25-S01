@@ -3,12 +3,14 @@ from LoadData import loadCalibrationMatrix
 import os
 
 
-def estimateE(F, K, calibration_path: str = '../P2Data/') -> np.ndarray:
-    K = loadCalibrationMatrix(os.path.join(calibration_path, 'calibration.txt'))
+def estimateE(F, calibration_path: str = '../P2Data/') -> np.ndarray:
+    K = loadCalibrationMatrix()
     E = K.T @ F @ K
+    print(E.shape)
 
     # Enforcing Rank 2
     U, S, VT = np.linalg.svd(E)
-    S[-1, -1] = 0
-    E = U @ S @ VT
+    print("S", S)
+    S=[1,1,0]
+    E = U @ np.diag(S) @ VT
     return E

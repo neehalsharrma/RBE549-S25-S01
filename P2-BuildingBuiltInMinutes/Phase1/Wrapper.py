@@ -5,10 +5,16 @@ import matplotlib.pyplot as plt
 import os
 import LoadData
 from EstimateFundamentalMatrix import estimateF, plot_epipolar_lines
+from EssentialMatrixFromFundamentalMatrix import *
 from GetInliersRANSAC import RANSAC, showRANSAC, cv2RANSAC
-from Phase1.GetInliersRANSAC import RANSAC_7pt
+from GetInliersRANSAC import RANSAC_7pt
+
+from ExtractCameraPose import *
+from LinearTriangulation import *
 
 if __name__ == '__main__':
+    K = loadCalibrationMatrix()
+    
     img1 = LoadData.loadImage(1)
     img2 = LoadData.loadImage(2)
     img = np.concatenate((img1, img2), axis=1)
@@ -32,3 +38,13 @@ if __name__ == '__main__':
     random_samples = np.random.default_rng().choice(a=correspondences, size=10, replace=False, axis=0,
                                                     shuffle=False)
     plot_epipolar_lines(F, random_samples[:20, 0:2], random_samples[:20, 2:4], img1, img2)
+
+    print("Fundamental Matrix- ", F)
+    EssentialMatrix= estimateE(F)
+    print("Essential Matrix- ", EssentialMatrix)
+    Cout, Rout= extract_camera_pose(EssentialMatrix)
+    print("Cout, Rout", Cout, Rout)
+
+    linearPoints= linearTriangulation(K, Rout[0], Cout[0], Rout[1], Cout[1], points1, points2)
+    print("LinearPoints", linearPoints)
+    seeTriangulation(linearPoints)

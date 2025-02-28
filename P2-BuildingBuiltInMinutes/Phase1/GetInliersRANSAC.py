@@ -10,7 +10,7 @@ import threading
 
 import numpy as np
 
-from Phase1.EstimateFundamentalMatrix import estimateF_7pt
+from EstimateFundamentalMatrix import estimateF_7pt
 
 
 # Using the Sampson distance to compute the number of inliers based on the algorithm from

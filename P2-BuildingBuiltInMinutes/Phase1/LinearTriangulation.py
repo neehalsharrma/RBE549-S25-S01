@@ -1,5 +1,5 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def linearTriangulation(K, R1, C1, R2, C2, points1, points2):
     """
@@ -15,16 +15,16 @@ def linearTriangulation(K, R1, C1, R2, C2, points1, points2):
     @ return: The estimated 3D points in the shape of (n, 3)
     """
     # Create the pose matrices for the cameras
-    P1 = K @ R1 @ np.concatenate((np.eye(3), -C1), axis=1)
-    P2 = K @ R2 @ np.concatenate((np.eye(3), -C2), axis=1)
+    P1 = K @ R1 @ np.concatenate((np.eye(3), np.expand_dims(-C1, axis=1)), axis=1)
+    P2 = K @ R2 @ np.concatenate((np.eye(3), np.expand_dims(-C2, axis=1)), axis=1)
+    print(P1[1].shape)
+    p1_1 = P1[0, :].reshape(1, 4)
+    p1_2 = P1[1, :].reshape(1, 4)
+    p1_3 = P1[2, :].reshape(1, 4)
 
-    p1_1 = P1[1:].reshape(1, 4)
-    p1_2 = P1[2:].reshape(1, 4)
-    p1_3 = P1[3:].reshape(1, 4)
-
-    p2_1 = P2[1:].reshape(1, 4)
-    p2_2 = P2[2:].reshape(1, 4)
-    p2_3 = P2[3:].reshape(1, 4)
+    p2_1 = P2[0, :].reshape(1, 4)
+    p2_2 = P2[1, :].reshape(1, 4)
+    p2_3 = P2[2, :].reshape(1, 4)
 
     points3D = []
     for i in range(points1.shape[0]):
@@ -33,14 +33,35 @@ def linearTriangulation(K, R1, C1, R2, C2, points1, points2):
         x2 = points2[i, 0]
         y2 = points2[i, 1]
         # From Page 312 of Hartley and Zisserman
-        A = np.array([[x1 * p1_3 - p1_1],
-                      [y1 * p1_3 - p1_2],
-                      [x2 * p2_3 - p2_1],
-                      [y2 * p2_3 - p2_2]])
+        A = np.array([[y1 * p1_3 - p2_2],
+                      [p1_1 - x1 * p1_3],
+                      [y2 * p2_3 - p2_2],
+                      [p2_1 - x2 * p2_3]])
+        A= np.array(A).reshape(4, 4)
+        
         _, _, VT = np.linalg.svd(A)
         V = VT.T
         X = V[:, -1]
         X = X / X[3]
         points3D.append(X)
 
-    return np.array(points3D).reshape(points1.shape[0], 3)
+    return np.array(points3D).reshape(points1.shape[0], 4)
+
+
+
+def seeTriangulation(Points):
+    X= Points[:,0].reshape(-1, 1)
+    Z= Points[:,1]
+    print(Points)
+    print(Points.shape)
+    print(X.shape)
+    plt.figure(figsize=(8, 6))
+    plt.scatter(X, Z, color='b', label='3D Points (Projected X-Z)')
+    plt.xlabel('X (Horizontal)')
+    plt.ylabel('Z (Depth)')
+    plt.title('Plot of Points by Z (Depth) and X (Horizontal)')
+    plt.axhline(0, color='black', linewidth=0.5)
+    plt.axvline(0, color='black', linewidth=0.5)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.show()
