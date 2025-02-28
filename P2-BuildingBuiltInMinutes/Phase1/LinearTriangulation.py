@@ -15,10 +15,11 @@ def linearTriangulation(K, R1, C1, R2, C2, points1, points2):
     @ return: The estimated 3D points in the shape of (n, 3)
     """
     # Create the pose matrices for the cameras
+    # Projection matrix is 3x4
     P1 = K @ R1 @ np.concatenate((np.eye(3), np.expand_dims(-C1, axis=1)), axis=1)
     P2 = K @ R2 @ np.concatenate((np.eye(3), np.expand_dims(-C2, axis=1)), axis=1)
-    print(P1[1].shape)
-    p1_1 = P1[0, :].reshape(1, 4)
+  
+    p1_1 = P1[0, :].reshape(1, 4) #[a, b, c, d] first row
     p1_2 = P1[1, :].reshape(1, 4)
     p1_3 = P1[2, :].reshape(1, 4)
 
@@ -33,10 +34,15 @@ def linearTriangulation(K, R1, C1, R2, C2, points1, points2):
         x2 = points2[i, 0]
         y2 = points2[i, 1]
         # From Page 312 of Hartley and Zisserman
-        A = np.array([[y1 * p1_3 - p2_2],
-                      [p1_1 - x1 * p1_3],
-                      [y2 * p2_3 - p2_2],
-                      [p2_1 - x2 * p2_3]])
+        # AX=0
+        A = np.array([[x1 * p1_3 - p1_1],
+                    [y1 * p1_3 - p1_2],
+                    [x2 * p2_3 - p2_1],
+                    [y2 * p2_3 - p2_2]])
+        # A = np.array([[y1 * p1_3 - p2_2],
+        #               [p1_1 - x1 * p1_3],
+        #               [y2 * p2_3 - p2_2],
+        #               [p2_1 - x2 * p2_3]])
         A= np.array(A).reshape(4, 4)
         
         _, _, VT = np.linalg.svd(A)
@@ -51,7 +57,7 @@ def linearTriangulation(K, R1, C1, R2, C2, points1, points2):
 
 def seeTriangulation(Points):
     X= Points[:,0].reshape(-1, 1)
-    Z= Points[:,1]
+    Z= Points[:,2]
     print(Points)
     print(Points.shape)
     print(X.shape)

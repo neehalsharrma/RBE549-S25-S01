@@ -14,6 +14,7 @@ def extract_camera_pose(essential: np.array) -> tuple[np.array, np.array]:
     R_out = []
     # SVD to decouple the rotation and the translation matrices from the essential matrix
     U, D, VT = np.linalg.svd(essential)
+    print("D", D)
     W = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
     # Get the rotation matrices and the translation vectors
     R1 = U @ W @ VT
@@ -21,6 +22,7 @@ def extract_camera_pose(essential: np.array) -> tuple[np.array, np.array]:
     C1_3 = U[:, 2].reshape(3, 1)
     C2_4 = -U[:, 2].reshape(3, 1)
     # Arrays to store the rotation matrices and the translation vectors
+    # C is 3x1 and R is 3x3
     C_matrices = [C1_3, C2_4, C1_3, C2_4]
     R_matrices = [R1, R1, R2, R2]
 

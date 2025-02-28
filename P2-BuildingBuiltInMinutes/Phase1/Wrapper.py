@@ -29,6 +29,7 @@ if __name__ == '__main__':
     correspondences = LoadData.loadCorrespondences(1, 2)
     points1 = correspondences[:, 0:2]
     points2 = correspondences[:, 2:4]
+    # Find F with ransac
     F, best_inliers, outliers = RANSAC_7pt(correspondences, threshold=6, acc_thresh=0.80)
 
     # showRANSAC(1, 2, best_inliers, outliers)
@@ -39,12 +40,17 @@ if __name__ == '__main__':
                                                     shuffle=False)
     plot_epipolar_lines(F, random_samples[:20, 0:2], random_samples[:20, 2:4], img1, img2)
 
+    # Get essential matrix from F
     print("Fundamental Matrix- ", F)
     EssentialMatrix= estimateE(F)
     print("Essential Matrix- ", EssentialMatrix)
+    # Get possible camera poses from essential matrix
     Cout, Rout= extract_camera_pose(EssentialMatrix)
     print("Cout, Rout", Cout, Rout)
 
-    linearPoints= linearTriangulation(K, Rout[0], Cout[0], Rout[1], Cout[1], points1, points2)
+    # Triangulate for one of the poses
+    R=np.eye(3)
+    C=np.zeros((3))
+    linearPoints= linearTriangulation(K, R, C, Rout[1], Cout[1], points1, points2)
     print("LinearPoints", linearPoints)
     seeTriangulation(linearPoints)
