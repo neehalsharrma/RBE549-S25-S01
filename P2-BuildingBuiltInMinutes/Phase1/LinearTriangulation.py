@@ -9,8 +9,8 @@ def linearTriangulation(K, R1, C1, R2, C2, points1, points2):
     @ C1: The center of the first camera in the shape of (3, 1)
     @ R2: The rotation matrix of the second camera in the shape of (3, 3)
     @ C2: The center of the second camera in the shape of (3, 1)
-    @ points1: The homogenized 2D points from the first image in the shape of (n, 3)
-    @ points2: The homogenized 2D points from the second image in the shape of (n, 3)
+    @ points1: The 2D points from the first image in the shape of (n, 2)
+    @ points2: The 2D points from the second image in the shape of (n, 2)
 
     @ return: The estimated 3D points in the shape of (n, 4)
     """
@@ -43,7 +43,7 @@ def linearTriangulation(K, R1, C1, R2, C2, points1, points2):
         X = X / X[3]
         points3D.append(X)
 
-    return np.array(points3D).reshape(points1.shape[0], 4)
+    return np.array(points3D).reshape(-1, 4)
 
 
 def linearTriangulation2(K, R1, C1, R2, C2, points1, points2):
@@ -54,8 +54,8 @@ def linearTriangulation2(K, R1, C1, R2, C2, points1, points2):
     @ C1: The center of the first camera in the shape of (3, 1)
     @ R2: The rotation matrix of the second camera in the shape of (3, 3)
     @ C2: The center of the second camera in the shape of (3, 1)
-    @ points1: The homogenized 2D points from the first image in the shape of (n, 3)
-    @ points2: The homogenized 2D points from the second image in the shape of (n, 3)
+    @ points1: The 2D points from the first image in the shape of (n, 2)
+    @ points2: The 2D points from the second image in the shape of (n, 2)
 
     @ return: The estimated 3D points in the shape of (n, 4)
     """
@@ -84,4 +84,4 @@ def linearTriangulation2(K, R1, C1, R2, C2, points1, points2):
         X = X / X[3]
         points3D.append(X)
 
-    return np.array(points3D).reshape(points1.shape[0], 4)
+    return np.array(points3D).reshape(-1,4)

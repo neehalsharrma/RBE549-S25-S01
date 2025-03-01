@@ -1,7 +1,4 @@
 import numpy as np
-from LoadData import loadCalibrationMatrix
-import os
-
 
 def estimateE(F, K) -> np.ndarray:
     """
@@ -18,3 +15,4 @@ def estimateE(F, K) -> np.ndarray:
     S = np.diag(S)
     E = U @ S @ VT
     return E
+

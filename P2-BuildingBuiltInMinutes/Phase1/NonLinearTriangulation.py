@@ -13,10 +13,11 @@ def calc_loss(x: np.array, P: np.array, X: np.array) -> float:
     x_hat = P @ X.T
     x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
     error = x - x_hat
-    return np.linalg.norm(error)
+    return np.power(error, 2)
+    # return np.linalg.norm(error)
 
 
-def loss_func(linear_X: np.array, x1: np.array, x2: np.array, P1: np.array, P2: np.array) -> float:
+def loss_func(linear_X: np.array, x1: np.array, x2: np.array, P1: np.array, P2: np.array):
     """
     Perform non-linear triangulation to estimate the 3D points.
     @ linear_X: The linear estimate of the 3D points in the shape of (1, 4)
@@ -27,7 +28,7 @@ def loss_func(linear_X: np.array, x1: np.array, x2: np.array, P1: np.array, P2: 
     """
     error1 = calc_loss(x1, P1, linear_X)
     error2 = calc_loss(x2, P2, linear_X)
-    return error1 + error2
+    return np.concatenate((error1, error2)).flatten()
 
 
 def non_linear_triangulation(K: np.array, R1: np.array, C1: np.array, R2: np.array, C2: np.array, x1: np.array,
@@ -62,8 +63,8 @@ def non_linear_triangulation(K: np.array, R1: np.array, C1: np.array, R2: np.arr
         point1 = x1[i, :]
         point2 = x2[i, :]
         x0 = linear_X[i, :]
-        optimized = scipy.optimize.least_squares(loss_func, x0, args=(point1, point2, P1, P2))
-        # ignore the homogenization point
+        optimized = scipy.optimize.least_squares(loss_func, x0, args=(point1, point2, P1, P2), method='lm')
+
         refined_X.append(optimized.x)
         costs.append(optimized.cost)
         if i % 100 == 0:
