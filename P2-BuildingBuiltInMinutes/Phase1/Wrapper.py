@@ -23,6 +23,7 @@ if __name__ == '__main__':
 
     correspondences = loadCorrespondences(1, 2)
 
+    # Calculate F, E, Poses
     F, best_inliers, outliers = RANSAC(correspondences, threshold=0.125, acc_thresh=0.85)
     showRANSAC(1, 2, best_inliers, outliers)
 
@@ -32,6 +33,7 @@ if __name__ == '__main__':
 
     C_out, R_out = extract_camera_pose(essential)
 
+    # Plot linear triangulation points on a plane
     fig = plt.figure()
     ax = fig.add_subplot(111)
     colors = ['r', 'c', 'b', 'y']
@@ -49,12 +51,14 @@ if __name__ == '__main__':
     ax.set_title('3D Reconstruction')
     plt.show()
 
+    # Chierality check
     C, R, inlier_idx = getCorrectPose(K, C_out, R_out, points1, points2)
     points1 = points1[inlier_idx]
     points2 = points2[inlier_idx]
     P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
     P2 = K @ R @ np.hstack((np.eye(3), -C))
 
+    # Plot correct pose
     triangulated_points = linearTriangulation(K, np.eye(3), np.zeros((3, 1)), R, C, points1, points2)
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -65,6 +69,7 @@ if __name__ == '__main__':
     ax.set_ylabel('Y')
     plt.show()
 
+    # Plot detected feature points on 2d image
     one = img1.copy()
     two = img2.copy()
     for i in range(points1.shape[0]):
@@ -73,11 +78,14 @@ if __name__ == '__main__':
     lin1 = one.copy()
     lin2 = two.copy()
 
+    # get non linear triangulation homogeneous 3d points
     optimized_points, costs = non_linear_triangulation(K, np.eye(3), np.zeros((3, 1)), R, C, points1, points2,
                                                        triangulated_points)
     opt1 = one.copy()
     opt2 = two.copy()
 
+    # Reproject linear and non linear homogeneous 3d points on images with detected feature points
+    # Each reprojected point is 2d homogeneous
     for i in range(points1.shape[0]):
         t_pt = triangulated_points[i]
         reproj_linear_1 = (np.dot(P1, t_pt))
