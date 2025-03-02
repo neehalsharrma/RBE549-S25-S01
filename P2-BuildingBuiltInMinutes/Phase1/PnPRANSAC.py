@@ -1,8 +1,5 @@
 import numpy as np
-
-
-def linear_PnP(X, x, K):
-    pass
+from LinearPnp import linear_PnP
 
 
 def error_func(P: np.array, X: np.array, x: np.array, threshold: float) -> float:
@@ -13,7 +10,7 @@ def error_func(P: np.array, X: np.array, x: np.array, threshold: float) -> float
     @ x: The homogenized 2D points in the shape of (n, 3)
     @ return: The number of inlier
     """
-    x_hat = P @ X.T
+    x_hat = (P @ X.T).T
     x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
     diffs = x - x_hat  # Shape: (n, 3)
     # Calculate the Euclidean distance of the reprojection error
@@ -59,20 +56,23 @@ def PNP_RANSAC(world_X, img_x, K, threshold=0.1, acc_thresh=0.85, max_iters=1000
 
     best_C = np.zeros((3, 1))
     best_R = np.eye(3)
-
+    print("Running PnP RANSAC")
     while best_acc < acc_thresh and max_iters > 0:
         # Randomly select 6 points
         idx = np.random.choice(num_features, 6, replace=False)
         x_sample = img_x[idx]
         X_sample = world_X[idx]
-        C, R = linear_PnP(X_sample, x_sample, K)
-        P = K @ np.hstack((R, -R @ C))
+        R, C = linear_PnP(K, x_sample, X_sample)
+        P = K @ np.hstack((R, -R @ C.reshape(3,1)))
         num_inliers = error_func(P, world_X, img_x, threshold)
         acc = num_inliers / num_features
         if acc > best_acc:
+            print("Best accuracy PnP RANSAC: ", acc)
             best_acc = acc
             best_C = C
             best_R = R
             inliers, outliers = get_inliers(P, world_X, img_x, threshold)
         max_iters -= 1
+    print(f'Original No. of features: {num_features}')
+    print(f"No. of inliers: {len(inliers)}")
     return best_C, best_R, inliers, outliers

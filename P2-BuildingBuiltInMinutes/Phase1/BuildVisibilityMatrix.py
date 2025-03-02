@@ -1,12 +1,12 @@
 import numpy as np
 
-def buildVisibilityMatrix(C_matrices, R_matrices, K, world_X_points, img_x_points):
+def buildVisibilityMatrix(C_matrices, R_matrices, K, world_X_points, img_x_points) ->np.array:
     """
     @ C_matrices: The camera centers in the shape of list[(n, 3)] of length num_imgs
     @ R_matrices: The rotation matrices in the shape of list[(3, 3)] of length num_imgs
     @ K: The intrinsic camera matrix in the shape of (3, 3)
     @ world_X_points: The homogenized 3D points for the world coordinate system in the shape of (n, 4)
-    @ img_x_points: The homogenized 2D points from each  image in the shape of list[(n, 3)] of length num_imgs
+    @ img_x_points: The homogenized 2D points from each image in the shape of list[(n, 3)] of length num_imgs
 
     @ return: The binary mask visibility matrix in the shape of (num_imgs, n) where Vij
                is one if the jth point is visible from the ith camera and zero otherwise

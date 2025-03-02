@@ -29,7 +29,7 @@ def nonlinearPnP(K, R1, C1, img_x, world_X):
         quat = center_and_quat[3:]
         R = Rotation.from_quat(quat).as_matrix()
         P = K @ np.hstack((R, -R @ C))
-        x_hat = P @ X.T
+        x_hat = (P @ X.T).T
         x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
         error = x - x_hat
         return np.linalg.norm(error)

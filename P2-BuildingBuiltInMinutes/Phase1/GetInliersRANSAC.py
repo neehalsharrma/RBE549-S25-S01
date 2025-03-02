@@ -47,8 +47,8 @@ def ssdThreshold(p1: np.array, p2: np.array, threshold: float, F: np.array) -> t
 
 
 # Single Threaded RANSAC written by Nikesh
-def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh=0.85, num_iterations=1000) -> tuple[
-    np.array, np.array, np.array]:
+def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh=0.85, num_iterations=1000) \
+        -> tuple[np.array, np.array, np.array]:
     """
     RANSAC Algorithm to find the best set of inliers.
     @ correspondences: The correspondences between the two images, np.array of shape (n, 4).
@@ -98,8 +98,9 @@ def RANSAC(correspondences: np.array, threshold: float = 5, acc_thresh=0.85, num
     F_hat = estimateF(normed1[best_inliers, :], normed2[best_inliers, :])
     # Denormalize the fundamental matrix
     F_hat = T2.T @ F_hat @ T1
-
-    return F_hat, best_inliers, outliers
+    inliers = np.hstack((points1[best_inliers, :], points2[best_inliers, :]))
+    outliers = np.hstack((points1[outliers, :], points2[outliers, :]))
+    return F_hat, inliers, outliers
 
 
 # Modified multithreaded RANSAC modified from the previous by ChatGPT

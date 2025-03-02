@@ -5,17 +5,15 @@ from scipy.spatial.transform import Rotation
 
 
 def bundle_adjustment(C_matrices: list[np.array], R_matrices: list[np.array], K: list[np.array],
-                      visibility_matrix: list[np.array],
-                      world_X_points: list[np.array],
+                      visibility_matrix: np.array,
+                      world_X_points: np.array,
                       points_2d: list[np.array]) -> tuple[list[np.array], list[np.array], np.array]:
     """
     Bundle Adjustment to refine the camera pose and the 3D points.
     @ C_matrices: The camera centers in the shape of list[(n, 3)] of length num_imgs
     @ R_matrices: The rotation matrices in the shape of list[(3, 3)] of length num_imgs
     @ K: The intrinsic camera matrix in the shape of (3, 3)
-    @ world_X_points: The homogenized 3D points for the world coordinate system
-                      In the shape of list[(n, 4)] of length num_imgs
-
+    @ world_X_points: The homogenized 3D points for the world coordinate system (n, 4)
     @ points_2d: The homogenized 2D points from the image in the shape of list[(n, 3)] of length num_imgs
     @ visibility_matrix: The binary mask visibility matrix in the shape of (num_imgs, n) where Vij
                          is one if the jth point is visible from the ith camera and zero otherwise
@@ -89,7 +87,7 @@ def bundle_adjustment(C_matrices: list[np.array], R_matrices: list[np.array], K:
     X0 = np.concatenate((poses.ravel(), points.ravel()))
     # Runs the optimization
     print("Running Bundle Adjustment")
-    optimized = least_squares(loss_func, X0, args=(n_cameras, n_points_per_img))
+    optimized = least_squares(loss_func, X0, args=(n_cameras, n_points_per_img), method='lm', jac_sparsity=visibility_matrix)
     print("Finished Bundle Adjustment")
     # Extracts the optimized parameters
     optimized_params = optimized.x

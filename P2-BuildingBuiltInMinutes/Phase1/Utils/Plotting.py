@@ -5,6 +5,7 @@ from Phase1.Utils.LoadData import loadImage
 from Phase1.LinearTriangulation import linearTriangulation
 import os
 
+
 def showRANSAC(image1: int, image2: int, inliers: np.array, outliers: np.array, save: bool = False,
                save_path: str = '../../Results/', title=None) -> None:
     """
@@ -43,6 +44,7 @@ def showRANSAC(image1: int, image2: int, inliers: np.array, outliers: np.array, 
     plt.axis('off')
     plt.show()
 
+
 def plot_linear_triangulation(K, C_out, R_out, points1, points2, save_path: str = '../../Results/',
                               save: bool = False) -> None:
     """
@@ -54,7 +56,7 @@ def plot_linear_triangulation(K, C_out, R_out, points1, points2, save_path: str 
     @ K: The intrinsic camera matrix in the shape of (3, 3)
     @ return: None
     """
-    fig=plt.figure()
+    fig = plt.figure()
     ax = fig.add_subplot(111)
 
     colors = ['r', 'c', 'b', 'y']
@@ -73,7 +75,9 @@ def plot_linear_triangulation(K, C_out, R_out, points1, points2, save_path: str 
         plt.savefig(os.path.join(save_path, 'LinearTriangulation.png'))
     plt.show()
 
-def plot_non_linear_triangulation(img1, img2, P1:np.array, P2:np.array, optimized:np.array, linear:np.array, img_points:np.array, save_path: str = '../../Results/', save:bool=False) -> None:
+
+def plot_non_linear_triangulation(img1, img2, P1: np.array, P2: np.array, optimized: np.array, linear: np.array,
+                                  img_points: np.array, save_path: str = '../../Results/', save: bool = False) -> None:
     """
     Plot non-linear triangulation points on a plane
     @ img1: The first image
@@ -98,7 +102,7 @@ def plot_non_linear_triangulation(img1, img2, P1:np.array, P2:np.array, optimize
     opt2 = two.copy()
     # Reproject linear and nonlinear homogeneous 3d points on images with detected feature points
     # Each reprojected point is 2d homogeneous
-    for i in range(points1.shape[0]):
+    for i in range(linear.shape[0]):
         t_pt = linear[i]
         reproj_linear_1 = (np.dot(P1, t_pt))
         reproj_linear_1 /= reproj_linear_1[2]
@@ -130,4 +134,63 @@ def plot_non_linear_triangulation(img1, img2, P1:np.array, P2:np.array, optimize
     ax[1, 1].set_title('Non-Linear Triangulation 2')
     if save:
         plt.savefig(os.path.join(save_path, 'NonLinearTriangulation.png'))
+    plt.show()
+
+
+def plot_optimizations(C_old, C_new, points_old, points_new):
+    """
+    Plot the camera center optimization.
+    @ C_old: The old camera center.
+    @ C_new: The new camera center.
+    @ points_old: The old points shape of (n, 4).
+    @ points_new: The new points shape of (n, 4).
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.scatter(points_old[:, 0], points_old[:, 2], c='r', marker='o', label='Old Points')
+    ax.scatter(points_new[:, 0], points_new[:, 2], c='b', marker='o', label='New Points')
+    ax.scatter(C_old[0], C_old[2], c='r', marker='x', label='Old Camera Center')
+    ax.scatter(C_new[0], C_new[2], c='b', marker='x', label='New Camera Center')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('Camera Center Optimization')
+    ax.legend()
+    plt.show()
+
+def plot_bundle_adj(C_mats, world_points_old, world_points):
+    """
+    Plot the bundle adjustment.
+    @ C_mats: The camera centers as a list of n x 3 arrays.
+    @ world_points_old: The old world points as an n x 4 array.
+    @ world_points: The world points as an n x 4 array.
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    for i in range(len(C_mats)):
+        ax.scatter(world_points[i, 0], world_points[i, 2], c='r', marker='o')
+        ax.scatter(C_mats[i][0], C_mats[i][2], c='b', marker='x')
+        ax.scatter(C_mats[i][0], C_mats[i][2], c='b', marker='x')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Z')
+    ax.set_title('Bundle Adjustment')
+    plt.show()
+
+
+def plot_reconstruction(C_mats, world_points):
+    """
+    Plot the final 3D reconstruction.
+    @ C_mats: The camera centers as a list of n x 3 arrays.
+    @ R_mats: The rotation matrices as a list of 3 x 3 arrays.
+    @ world_points: The world points as an n x 4 array.
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    for i in range(len(C_mats)):
+        ax.scatter(world_points[i, 0], world_points[i, 1], world_points[i, 2], c='r', marker='o')
+        ax.scatter(C_mats[i][0], C_mats[i][1], C_mats[i][2], c='b', marker='x')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('3D Reconstruction')
     plt.show()
