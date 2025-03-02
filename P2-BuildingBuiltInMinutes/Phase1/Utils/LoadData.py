@@ -15,6 +15,7 @@ def loadImage(img: int, data_path: str = '../P2Data/') -> np.ndarray:
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
+
 def loadCalibrationMatrix(data_path: str = '../P2Data/') -> np.ndarray:
     """
     Load the calibration matrix from the given path and return the calibration matrix as a NumPy array.
@@ -29,6 +30,7 @@ def loadCalibrationMatrix(data_path: str = '../P2Data/') -> np.ndarray:
             values = list(map(float, line.split()))
             K[i] = np.array(values)
     return K
+
 
 # Loading lines into a NumPy numerical array where each row in file is written as a row of ints in the NumPy array
 def loadDataFull(img: int, data_path: str = '../P2Data/', num_images: int = 5) -> tuple[int, np.ndarray]:
@@ -58,18 +60,48 @@ def loadDataFull(img: int, data_path: str = '../P2Data/', num_images: int = 5) -
         for i, line in enumerate(lines[1:]):
             values = list(map(float, line.split()))
             matches[i, :len(values)] = np.array(values)
-
-    # img_path = data_path + str(img) + '.png'
-    #
-    # # Load the images
-    # img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
-    #
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #
     return n_features, matches
 
+
+def loadDataSparse(img_num: int, data_path: str = '../P2Data/', num_images: int = 5) -> np.ndarray:
+    """
+    Load the data from the given path and return the data as an np.array.
+    @ data_path: The path to the data.
+    @ img_num: The image to load.
+    @ num_images: The number of images to be used in the SfM matching
+    @ return:a sparse matrix of the data from the file in the size of (n_features, header_data -1 + 2 * (num_images - img))
+    Format for matches:
+    Each Row: (the number of matches for the jth feature)
+              (Red Value) (Green Value) (Blue Value)
+              (u_current image) (v_current image)
+              (image id) (u_{image_id image}) (v_{image_id_image})
+              (image id) (u_{image_id_image}) (v_{image id image}) …
+    """
+    # Load the data from the file.
+    matching_file = data_path + 'matching' + str(img_num) + '.txt'
+    header_data = 6  # header_data- (#matches, R, G, B, u, v)
+    with open(matching_file, 'r') as file:
+        lines = file.readlines()
+        # Extract the number of features
+        num_lines = len(lines) - 1
+        # Process the feature data into a NumPy array- (headerData, match1, match2, match3, ..., matchTotalImages); match- (u, v)
+        matches = np.zeros((num_lines, header_data - 1 + (num_images - img_num) * 3), dtype=np.float32)
+        for i, line in enumerate(lines[1:]):
+            values = list(map(float, line.split()))
+            # Add the header data to the matches array
+            matches[i, :(header_data - 1)] = np.array(values[1:header_data])
+            # Add the matches to the matches array
+            for j in range((len(values) - header_data) // 3):
+                offset = header_data + j * 3
+                img_id = int(values[offset]) - img_num - 1
+               # Add the image id and the u, v values to the matches array
+                matches[i, (header_data - 1) + img_id * 2:(header_data + 1) + img_id * 2] = np.array(
+                values[offset + 1:offset + 3])
+    return matches
+
+
 # Return correspondences between two images- array of (img1_x, img1_y, img2_x, img2_y)
-def loadCorrespondences(image1: int, image2:int, data_path: str = '../P2Data/', num_images:int = 5) -> np.ndarray:
+def loadCorrespondences(image1: int, image2: int, data_path: str = '../P2Data/', num_images: int = 5) -> np.ndarray:
     """
     Load the correspondences between two images from the given path and return the data as a NumPy array.
     @ data_path: The path to the data.
@@ -117,6 +149,24 @@ def showMatches(image1: int, image2: int, data_path: str = '../P2Data/'):
 
     for i in range(correspondences.shape[0]):
         x1, y1, x2, y2 = correspondences[i]
+        cv2.circle(img, (int(x1), int(y1)), 3, (0, 0, 255), 2)
+        cv2.circle(img, (int(x2) + img1.shape[1], int(y2)), 3, (0, 0, 255), 2)
+        cv2.line(img, (int(x1), int(y1)), (int(x2) + img1.shape[1], int(y2)), (127, 0, 0), 1)
+
+    plt.figure(figsize=(10, 10))
+    plt.title('Matches between Image ' + str(image1) + ' and Image ' + str(image2))
+    plt.imshow(img)
+    plt.axis('off')
+    plt.show()
+
+
+def showMatches2(image1: int, image2: int, points1: np.array, points2: np.array):
+    img1 = loadImage(image1)
+    img2 = loadImage(image2)
+    img = np.concatenate((img1, img2), axis=1)
+    for i in range(points1.shape[0]):
+        x1, y1 = points1[i, :]
+        x2, y2 = points2[i, :]
         cv2.circle(img, (int(x1), int(y1)), 3, (0, 0, 255), 2)
         cv2.circle(img, (int(x2) + img1.shape[1], int(y2)), 3, (0, 0, 255), 2)
         cv2.line(img, (int(x1), int(y1)), (int(x2) + img1.shape[1], int(y2)), (127, 0, 0), 1)
