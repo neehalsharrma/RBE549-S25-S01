@@ -30,7 +30,7 @@ def loss_func(linear_X: np.array, x1: np.array, x2: np.array, P1: np.array, P2: 
     error2 = calc_loss(x2, P2, linear_X)
     return np.concatenate((error1, error2)).flatten()
 
-
+# Returns 3d Points homogenized points
 def non_linear_triangulation(K: np.array, R1: np.array, C1: np.array, R2: np.array, C2: np.array, x1: np.array,
                              x2: np.array, linear_X: np.array) -> tuple[np.array, list[float]]:
     """
