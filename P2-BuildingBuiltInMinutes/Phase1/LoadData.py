@@ -99,12 +99,15 @@ def load_data_full(
     -------
     tuple[int, np.ndarray]
         A tuple containing the number of matches and the data from the file.
-        Format for matches:
-        Each Row: (the number of matches for the jth feature)
-                  (Red Value) (Green Value) (Blue Value)
-                  (u_current image) (v_current image)
-                  (image id) (u_{image_id image}) (v_{image_id_image})
-                  (image id) (u_{image_id_image}) (v_{image id image}) …
+
+    Notes
+    -----
+    Format for matches:
+    Each Row: (the number of matches for the jth feature)
+              (Red Value) (Green Value) (Blue Value)
+              (u_current image) (v_current image)
+              (image id) (u_{image_id image}) (v_{image_id_image})
+              (image id) (u_{image_id_image}) (v_{image id image}) …
     """
     matching_file = data_path + "matching" + str(img) + ".txt"  # Construct the matching file path
     header_data = 6  # Number of header data columns
