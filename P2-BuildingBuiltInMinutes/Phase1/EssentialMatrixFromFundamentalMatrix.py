@@ -31,7 +31,6 @@ def estimateE(F: np.ndarray, K: np.ndarray) -> np.ndarray:
 
     # Enforcing Rank 2
     U, S, VT = np.linalg.svd(E)
-    singular_values = [1, 1, 0]  # Set the singular values to [1, 1, 0]
-    singular_values = np.diag(singular_values)
-    E = U @ singular_values @ VT  # Recompute the Essential Matrix with enforced rank 2
+    S=[1,1,0]
+    E = U @ np.diag(S) @ VT
     return E

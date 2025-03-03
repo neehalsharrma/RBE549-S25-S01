@@ -13,52 +13,103 @@ def linear_PnP(
 import numpy as np
 
 
-def linear_PnP(
-    K: np.ndarray, points2D: np.ndarray, points3D: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+def calc_loss(x: np.array, P: np.array, X: np.array) -> float:
     """
-    Perform Linear PnP to estimate the camera pose.
-
-    Parameters
-    ----------
-    K : np.ndarray
-        The intrinsic camera matrix in the shape of (3, 3).
-    points2D : np.ndarray
-        The 2D points from the image in the shape of (n, 2).
-    points3D : np.ndarray
-        The 3D points in the shape of (n, 3).
-
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray]
-        The rotation matrix (3, 3) and the camera center (3, 1).
+    Calculate the loss for the non-linear triangulation.
+    @ x: The 2D points from the image in the shape of (n, 3) since it's homogenized
+    @ P: The projection matrix in the shape of (3, 4)
+    @ X: The 3D points in the shape of (n, 3)
+    @ return The loss for the non-linear triangulation, the shape is a (1, 3) vector.
     """
-    # Number of points
-    # Calculate the number of 2D points
+    x_hat = P @ X.T
+    x_hat = x_hat / x_hat[:, 2, np.newaxis]  # divide by the last row of P.T @ X
+    error = x - x_hat
+    return np.linalg.norm(error)
 
-    # Convert 2D points to homogeneous coordinates
-    points2d_homogeneous = np.hstack((points2D, np.ones((num_points, 1))))
 
-    # Construct the matrix A for the linear system
-    A = np.zeros((2 * num_points, 12))
-    for i in range(num_points):
-        X, Y, Z = points3D[i]
-        u, v = points2d_homogeneous[i, :2]
-        A[2 * i] = [X, Y, Z, 1, 0, 0, 0, 0, -u * X, -u * Y, -u * Z, -u]
-        A[2 * i + 1] = [0, 0, 0, 0, X, Y, Z, 1, -v * X, -v * Y, -v * Z, -v]
+def get_inliers(x, X, P, threshold):
+    points2d = []
+    points3d = []
+    for i in range(x.shape[0]):
+        if calc_loss(x[i], P, X[i]) < threshold:
+            points2d.append(x[i])
+            points3d.append(X[i])
+    return points2d, points3d
 
-    # Solve the linear system using SVD
-    _, _, VT = np.linalg.svd(A)
-    P = VT[-1].reshape(3, 4)
 
-    # Decompose the projection matrix to get R and C
-    R = P[:, :3]
-    t = P[:, 3]
-    C = -np.linalg.inv(R) @ t
+def calc_inliers(x, X, P, threshold):
+    tot = 0
+    for i in range(x.shape[0]):
+        if calc_loss(x[i], P, X[i]) < threshold:
+            tot += 1
+    return tot
 
-    return R, C.reshape(3, 1)
-    # Ensure R is a valid rotation matrix using QR decomposition
-    U, _, Vt = np.linalg.svd(R)
-    R = U @ Vt
 
-    return R, C.reshape(3, 1)
+def get_equation(point3D, point2D):
+    X, Y, Z, _ = point3D
+    x, y, _ = point2D
+    return np.array([[X, Y, Z, 1, 0, 0, 0, 0, -x * X, -x * Y, -x * Z, -x],
+                     [0, 0, 0, 0, X, Y, Z, 1, -y * X, -y * Y, -y * Z, -y]])
+
+
+def linear_PnP(K, points2D, points3D):
+    """
+    Linear PnP to estimate the 3D points.
+    @ K: The intrinsic camera matrix in the shape of (3, 3)
+    @ R: The rotation matrix of the camera in the shape of (3, 3)
+    @ C: The center of the camera in the shape of (3, 1)
+    @ points2D: The 2D points from the image in the shape of (n, 2)
+    @ points3D: The 3D points in the shape of (n, 3)
+    @ return: The estimated camera center and rotation matrix
+    """
+    # Solve linear least squares
+    # AP=0
+    n = points3D.shape[0]
+    A = None
+    for i in range(n):
+        a = get_equation(points3D[i], points2D[i])
+        if i > 0:
+            A = np.vstack((A, a))
+        else:
+            A = a
+
+    U, S, VT = np.linalg.svd(A)
+    P = VT.T[-1, :].reshape((3, 4))
+    inv_K = np.linalg.inv(K)
+
+    R = inv_K @ P[:, :3]  # inverse of K times the first 3 columns of P
+    # SVD cleanup of R
+    UR, DR, VTR = np.linalg.svd(R)
+    R = UR @ VTR
+    T = (inv_K @ P[:, -1])
+    if np.linalg.det(R) < 0:
+        R = -R
+    C = - R.T @ T
+    return R, C
+
+
+def PnPRansac(K, points2D, points3D, threshold=float(5), acc_thresh=0.85):
+    rng = np.random.default_rng()
+    best_percent = 0
+
+    tot_size = points2D.shape[0]
+    while best_percent < acc_thresh:
+        random_samples = rng.integers(0, tot_size, size=6, replace=False)
+        point2D = points2D[random_samples]
+        point3D = points3D[random_samples]
+        R, C = linear_PnP(K, point2D, point3D)
+        P = np.hstack(R, C)
+        num_inliers = calc_inliers(points2D, points3D, P, threshold)
+
+        percent_match = num_inliers / tot_size
+        # if a better match is found, update the best match
+        if percent_match > best_percent:
+            best_percent = percent_match
+            best_points2D, best_points3D = get_inliers(points2D, points3D, P, threshold)
+            print(f"Best Percent: {best_percent}")
+
+    print(f'Original No. of features: {tot_size}')
+    print(f"No. of inliers: {best_points2D.shape[0]}")
+    best_R, best_C = linear_PnP(K, point2D, point3D)
+
+    return best_R, best_C

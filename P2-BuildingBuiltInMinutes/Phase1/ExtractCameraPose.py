@@ -39,7 +39,8 @@ def extract_camera_pose(essential: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     # Compute the two possible translation vectors (up to scale)
     C1_3 = U[:, 2].reshape(3, 1) / np.linalg.norm(U[:, 2])
     C2_4 = -U[:, 2].reshape(3, 1) / np.linalg.norm(U[:, 2])
-    # Arrays to store the possible translation vectors and rotation matrices
+    # Arrays to store the rotation matrices and the translation vectors
+    # C is 3x1 and R is 3x3
     C_matrices = [C1_3, C2_4, C1_3, C2_4]
     R_matrices = [R1, R1, R2, R2]
 

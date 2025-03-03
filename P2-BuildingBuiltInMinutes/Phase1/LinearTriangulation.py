@@ -11,7 +11,7 @@ linear_triangulation2(K, R1, C1, R2, C2, points1, points2)
 """
 
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def linear_triangulation(
     K: np.ndarray,
@@ -66,15 +66,17 @@ def linear_triangulation(
         x1, y1 = points1[i]
         x2, y2 = points2[i]
         # From Page 312 of Hartley and Zisserman
-        A = np.array(
-            [
-                [x1 * p1_3 - p1_1],
-                [y1 * p1_3 - p1_2],
-                [x2 * p2_3 - p2_1],
-                [y2 * p2_3 - p2_2],
-            ]
-        ).reshape(4, 4)
-        # Solve the linear system
+        # AX=0
+        A = np.array([[x1 * p1_3 - p1_1],
+                    [y1 * p1_3 - p1_2],
+                    [x2 * p2_3 - p2_1],
+                    [y2 * p2_3 - p2_2]])
+        # A = np.array([[y1 * p1_3 - p2_2],
+        #               [p1_1 - x1 * p1_3],
+        #               [y2 * p2_3 - p2_2],
+        #               [p2_1 - x2 * p2_3]])
+        A= np.array(A).reshape(4, 4)
+        
         _, _, VT = np.linalg.svd(A)
         V = VT.T
         X = V[:, -1]
@@ -84,15 +86,27 @@ def linear_triangulation(
     return np.array(points3D).reshape(-1, 4)
 
 
-def linear_triangulation2(
-    K: np.ndarray,
-    R1: np.ndarray,
-    C1: np.ndarray,
-    R2: np.ndarray,
-    C2: np.ndarray,
-    points1: np.ndarray,
-    points2: np.ndarray,
-) -> np.ndarray:
+
+def seeTriangulation(Points):
+    X= Points[:,0].reshape(-1, 1)
+    Z= Points[:,2]
+    print(Points)
+    print(Points.shape)
+    print(X.shape)
+    plt.figure(figsize=(8, 6))
+    plt.scatter(X, Z, color='b', label='3D Points (Projected X-Z)')
+    plt.xlabel('X (Horizontal)')
+    plt.ylabel('Z (Depth)')
+    plt.title('Plot of Points by Z (Depth) and X (Horizontal)')
+    plt.axhline(0, color='black', linewidth=0.5)
+    plt.axvline(0, color='black', linewidth=0.5)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.show()
+    
+
+
+def linearTriangulation2(K, R1, C1, R2, C2, points1, points2):
     """
     Linear Triangulation to estimate the 3D points.
 

@@ -1,209 +1,152 @@
-"""
-This module performs 3D reconstruction from two images using Structure from Motion (SfM).
-
-Functions
----------
-main() -> None
-    Main function to perform 3D reconstruction from two images.
-"""
-
-import cv2
-import matplotlib.pyplot as plt
+# Create Your Own Starter Code :)
+import argparse
 import numpy as np
-from DisambiguateCameraPose import getCorrectPose
+
+from Phase1.BundleAdjustment import bundle_adjustment
+from PnPRANSAC import PNP_RANSAC
+from Phase1.Utils.LoadData import *
+from EstimateFundamentalMatrix import estimateF
+from GetInliersRANSAC import RANSAC
+from ExtractCameraPose import extract_camera_pose
 from EssentialMatrixFromFundamentalMatrix import estimateE
 from ExtractCameraPose import extract_camera_pose
 from GetInliersRANSAC import RANSAC, show_RANSAC
 from LinearTriangulation import linear_triangulation
 from LoadData import load_calibration_matrix, load_image, load_correspondence
 from NonLinearTriangulation import non_linear_triangulation
+from NonlinearPnP import nonlinearPnP
+from Utils.Plotting import *
+from BuildVisibilityMatrix import buildVisibilityMatrix
 
+if __name__ == '__main__':
+    Parser = argparse.ArgumentParser()
+    Parser.add_argument('--NumImgs', help='The number of images', type=int, default=5)
+    Parser.add_argument('--PlotAll', help='Plot all the images', type=bool, default=True)
+    Parser.add_argument('--RANSACThreshold', help='The threshold for RANSAC', type=float, default=0.125)
+    Parser.add_argument('--AccThreshold', help='The threshold for the accuracy of RANSAC', type=float, default=0.85)
 
-def main() -> None:
-    """
-    Main function to perform 3D reconstruction from two images.
-    """
-    # Load the calibration matrix
-    K = load_calibration_matrix()
+    args = Parser.parse_args()
+    num_images = args.NumImgs
+    thresh = args.RANSACThreshold
+    acc_thresh = args.AccThreshold
+    plot = args.PlotAll
 
-    # Load the images
-    img1 = load_image(1)
-    img2 = load_image(2)
+    K = loadCalibrationMatrix()
 
-    # Load the correspondences between the images
-    correspondences = load_correspondence(1, 2)
+    # Clean up all the image point correspondences
+    # Store the RANSAC correspondences as a list[list[np.array]]
+    # Due to how the data is stored in the calibration files,
+    # the current image stores it correspondences with all subsequent images
+    # i.e. image 0 stores its correspondences with images 1, 2, 3, 4
+    # i.e. image 1 stores its correspondences with images 2, 3, 4
+    # Thus, the number of columns in each correspondence matrix is (num_images - i) * 2 + 5
+    image_inliers = []
+    image_outliers = []
+    for i in range(1, num_images):
+        RANSAC_correspondences = []
+        outliers_correspondences = []
+        for j in range(i + 1, num_images + 1):
+            correspondences = loadCorrespondences(i, j)
+            _, inliers_ij, outliers = RANSAC(correspondences, threshold=thresh, acc_thresh=acc_thresh)
+            RANSAC_correspondences.append(inliers_ij)
+            outliers_correspondences.append(outliers)
+        image_inliers.append(RANSAC_correspondences)
+        image_outliers.append(outliers_correspondences)
+    ##########################################################################################
+    # Perform the start of SfM using the first two images as the basepoint
+    inliers_1_2 = image_inliers[0][0]
+    outliers_1_2 = image_outliers[0][0]
+    # Get only the elements that have a correspondence with the first two images
+    points1 = inliers_1_2[:, :2]
+    points2 = inliers_1_2[:, 2:]
+    ################################################################################################
+    # Show the features and the matches of the first two images
+    correspondences = loadCorrespondences(1, 2)
+    img1 = loadImage(1)
+    img2 = loadImage(2)
+    showMatches2(1, 2, points1, points2)
+    showRANSAC(1, 2, inliers_1_2, outliers_1_2)
+    ################################################################################################
 
-    # Perform RANSAC to find the best fundamental matrix and inliers
-    F, best_inliers, outliers = RANSAC(
-        correspondences, threshold=0.125, acc_thresh=0.85
-    )
-    # Visualize the RANSAC results
-    show_RANSAC(image1=1, image2=2, inliers=best_inliers, outliers=outliers)
+    F = estimateF(points1, points2)
+    # random_samples = np.random.default_rng().choice(a=correspondences, size=10, replace=False, axis=0,
+    #                                                 shuffle=False)
+    # plot_epipolar_lines(F, random_samples[:20, 0:2], random_samples[:20, 2:4], img1, img2)
 
-    # Extract the inlier points
-    points1 = best_inliers[:, 0:2]
-    points2 = best_inliers[:, 2:4]
-
-    # Estimate the essential matrix from the fundamental matrix
     essential = estimateE(F, K)
-
-    # Extract the camera poses from the essential matrix
+    ##########################################################################################
+    # Ground zero camera pose
+    R0, C0 = np.eye(3), np.zeros((3, 1))
     C_out, R_out = extract_camera_pose(essential)
-
-    # Plot the initial 3D points using linear triangulation
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    colors = ["r", "c", "b", "y"]
-
-    # Loop through each camera pose candidate
-    for camera_index in range(C_out.shape[0]):
-        # Perform linear triangulation for the current camera pose
-        points = linear_triangulation(
-            K,
-            np.eye(3),
-            np.zeros((3, 1)),
-            R_out[camera_index],
-            C_out[camera_index].reshape(3, 1),
-            points1,
-            points2,
-        )
-        # Scatter plot the triangulated 3D points for the current camera pose
-        ax.scatter(
-            points[:, 0], points[:, 2], marker="o", label=f"Camera {camera_index + 1}", c=colors[camera_index]
-        )
-        # Plot the camera position
-        ax.plot(C_out[camera_index, 0], C_out[camera_index, 2], marker="x", color="k", markersize=10)
-    
-    # Plot the origin
-    ax.plot([0], [0], marker="x", color="k", markersize=10)
-
-    # Set the labels and title for the plot
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_title("3D Reconstruction")
-    ax.legend()
-    # Display the plot
-    plt.show()
-
-    # Disambiguate the correct camera pose
+    if plot:
+        plot_linear_triangulation(K, C_out, R_out, points1, points2)
+    ##########################################################################################
+    # Chierality check
     C, R, inlier_idx = getCorrectPose(K, C_out, R_out, points1, points2)
     points1 = points1[inlier_idx]
     points2 = points2[inlier_idx]
+    triangulated_points = linearTriangulation(K, R0, C0, R, C, points1, points2)
+    if plot:
+        plot_linear_triangulation(K, np.expand_dims(C,axis=0), np.expand_dims(R, axis=0), points1, points2)
+    ##########################################################################################
+    # Homogenize the 2D points to be an (n, 3) matrix
+    x1 = np.hstack((points1, np.ones((points1.shape[0], 1))))
+    x2 = np.hstack((points2, np.ones((points1.shape[0], 1))))
+    optimized, _ = non_linear_triangulation(K, R0, C0, R, C, x1, x2, triangulated_points)
+    if plot:
+        P1 = K @ np.hstack((R0, -C0))
+        P2 = K @ np.hstack((R, -R @ C))
+        plot_non_linear_triangulation(img1, img2, P1, P2, optimized, triangulated_points, np.hstack((points1, points2)))
+    ##########################################################################################
+    # Create an array that stores the 2D and 3D correspondences for first image to the world points
+    img_X_x_matching = np.hstack((points1, optimized))
 
-    # Compute the projection matrices
-    P1 = K @ np.hstack((np.eye(3), np.zeros((3, 1))))
-    P2 = K @ R @ np.hstack((np.eye(3), -C))
+    # Perform the rest of the SfM using the rest of the images in reference to image 1
+    C_set = [C]
+    R_set = [R]
+    world_points = optimized
+    for i in range(1, num_images):
+        img_i_correspondences = image_inliers[0][i]
 
-    # Perform linear triangulation with the correct pose
-    triangulated_points = linear_triangulation(
-        K, np.eye(3), np.zeros((3, 1)), R, C, points1, points2
-    )
-    # Plot the triangulated 3D points
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.scatter(triangulated_points[:, 0], triangulated_points[:, 2], c="b", marker="o")
-    ax.plot([0], [0], marker="x", color="k", markersize=10)
-    ax.plot(C[0], C[2], marker="o", color="g", markersize=10)
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    plt.show()
+        # Assuming img_i_correspondences and points1 are already defined
+        # Find the indices of elements in img_i_correspondences[:, :2] that are in points1
+        indices = np.argwhere(np.isin(img_i_correspondences[:, :2], points1).all(axis=1)).ravel()
+        # Get the world points that exist in the current image
+        # and the first image and then use this to make the correspondences
+        pnp_world_points = img_X_x_matching[indices, 2:]
 
-    # Draw circles on the original images for visualization
-    one = img1.copy()
-    two = img2.copy()
-    for point_index in range(points1.shape[0]):
-        one = cv2.circle(one, (int(points1[point_index, 0]), int(points1[point_index, 1])), 5, (0, 0, 255))
-        two = cv2.circle(two, (int(points2[point_index, 0]), int(points2[point_index, 1])), 5, (0, 0, 255))
-    lin1 = one.copy()
-    lin2 = two.copy()
+        base_img_points = img_i_correspondences[indices, :2]
+        base_img_points = np.hstack((base_img_points, np.ones((base_img_points.shape[0], 1))))
+        pnp_img_points = img_i_correspondences[indices, 2:]
+        pnp_img_points = np.hstack((pnp_img_points, np.ones((pnp_img_points.shape[0], 1))))
 
-    # Perform non-linear triangulation to optimize the 3D points
-    optimized_points, costs = non_linear_triangulation(
-        K, np.eye(3), np.zeros((3, 1)), R, C, points1, points2, triangulated_points
-    )
-    opt1 = one.copy()
-    opt2 = two.copy()
+        C_pnp, R_pnp, inliers_pnp, outliers_pnp = PNP_RANSAC(pnp_world_points, pnp_img_points, K, threshold=100,
+                                                             acc_thresh=0.85, max_iters=10000)
+        points = pnp_world_points[inliers_pnp]
+        opt_points = pnp_img_points[inliers_pnp]
 
-    # Reproject the points and draw circles for linear and non-linear triangulation
-    for point_index in range(points1.shape[0]):
-        # Get the triangulated 3D point
-        t_pt = triangulated_points[point_index]
-        
-        # Reproject the triangulated point onto the first image
-        reproj_linear_1 = np.dot(P1, t_pt)
-        reproj_linear_1 /= reproj_linear_1[2]
-        
-        # Reproject the triangulated point onto the second image
-        reproj_linear_2 = np.dot(P2, t_pt)
-        reproj_linear_2 /= reproj_linear_2[2]
-        
-        # Draw a green circle on the first image at the reprojected point location
-        lin1 = cv2.circle(
-            lin1, (int(reproj_linear_1[0]), int(reproj_linear_1[1])), 5, (0, 255, 0)
-        )
-        
-        # Draw a green circle on the second image at the reprojected point location
-        lin2 = cv2.circle(
-            lin2, (int(reproj_linear_2[0]), int(reproj_linear_2[1])), 5, (0, 255, 0)
-        )
-
-        # Get the optimized 3D point
-        o_pt = optimized_points[point_index]
-        
-        # Reproject the optimized point onto the first image
-        reproj_optimized_1 = np.dot(P1, o_pt)
-        reproj_optimized_1 /= reproj_optimized_1[2]
-        
-        # Reproject the optimized point onto the second image
-        reproj_optimized_2 = np.dot(P2, o_pt)
-        reproj_optimized_2 /= reproj_optimized_2[2]
-        
-        # Draw a blue circle on the first image at the reprojected point location
-        opt1 = cv2.circle(
-            opt1,
-            (int(reproj_optimized_1[0]), int(reproj_optimized_1[1])),
-            5,
-            (255, 0, 0),
-        )
-        
-        # Draw a blue circle on the second image at the reprojected point location
-        opt2 = cv2.circle(
-            opt2,
-            (int(reproj_optimized_2[0]), int(reproj_optimized_2[1])),
-            5,
-            (255, 0, 0),
-        )
-
-    # Save the results of linear and non-linear triangulation
-    fig, ax = plt.subplots(2, 2)
-    ax[0, 0].imshow(lin1)
-    ax[0, 0].axis("off")
-    ax[0, 0].set_title("Linear Triangulation 1")
-    ax[0, 1].imshow(lin2)
-    ax[0, 1].axis("off")
-    ax[0, 1].set_title("Linear Triangulation 2")
-    ax[1, 0].imshow(opt1)
-    ax[1, 0].axis("off")
-    ax[1, 0].set_title("Non-Linear Triangulation 1")
-    ax[1, 1].imshow(opt2)
-    ax[1, 1].axis("off")
-    ax[1, 1].set_title("Non-Linear Triangulation 2")
-    plt.savefig('Outputs/triangulation_results.png')
-    plt.close()
-
-    # Save the 3D points from linear and non-linear triangulation
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.scatter(optimized_points[:, 0], optimized_points[:, 2], c="r", marker="o")
-    ax.scatter(triangulated_points[:, 0], triangulated_points[:, 2], c="b", marker="o")
-    ax.plot([0], [0], marker="x", color="k", markersize=10)
-    ax.plot(C[0], C[2], marker="o", color="g", markersize=10)
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_title("3D Reconstruction")
-    plt.savefig('Outputs/3d_reconstruction.png')
-    plt.close()
+        C_pnp_opt, R_pnp_opt = nonlinearPnP(K, R_pnp, C_pnp, pnp_img_points, pnp_world_points)
 
 
-if __name__ == "__main__":
-    main()
+
+        C_set.append(C_pnp)
+        R_set.append(R_pnp)
+        X_new = linearTriangulation(K, R0, C0, R_pnp_opt, C_pnp_opt, base_img_points, pnp_img_points[:, :2])
+        X_new, _ = non_linear_triangulation(K, R0, C0, R_pnp_opt, C_pnp_opt, base_img_points, pnp_img_points, X_new)
+        P_opt = K @ np.hstack((R_pnp_opt, -R_pnp_opt @ C_pnp_opt))
+        points_2d = (P_opt @ X_new.T).T
+        points_2d = points_2d / points_2d[:,2, np.newaxis]
+
+
+        img_X_x_matching = np.vstack((img_X_x_matching, np.hstack((points_2d[:,:2], X_new))))
+        world_points = np.vstack((world_points, X_new))
+
+        vis = buildVisibilityMatrix(C_set, R_set, K, world_points, image_inliers[0])
+
+        # Bundle Adjustment
+        C_set, R_set, world_points_new = bundle_adjustment(C_set, R_set, K, vis, world_points, image_inliers[0])
+        world_points = world_points_new
+        plot_bundle_adj(C_set, R_set, world_points)
+
+    # Plot the final 3D reconstruction
+    plot_reconstruction(C_set, world_points)
