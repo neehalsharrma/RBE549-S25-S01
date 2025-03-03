@@ -11,7 +11,7 @@ def error_func(P: np.array, X: np.array, x: np.array, threshold: float) -> float
     @ return: The number of inlier
     """
     x_hat = (P @ X.T).T
-    x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
+    x_hat = x_hat / x_hat[:, 2, np.newaxis]  # divide by the last row of P.T @ X
     diffs = x - x_hat  # Shape: (n, 3)
     # Calculate the Euclidean distance of the reprojection error
     errors = np.linalg.norm(diffs, axis=1)  # Shape: (n,)
@@ -27,17 +27,18 @@ def get_inliers(P, X, x, threshold: float) -> tuple[np.array, np.array]:
     @ threshold: The threshold to be used.
     @ return: The inlier and outlier indices
     """
-    x_hat = P @ X.T
-    x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
+    x_hat = (P @ X.T).T
+    x_hat = x_hat / x_hat[:, 2, np.newaxis]  # divide by the last row of P.T @ X
     diffs = x - x_hat  # Shape: (n, 3)
     # Calculate the Euclidean distance of the reprojection error
     errors = np.linalg.norm(diffs, axis=1)  # Shape: (n,)
-    inliers = np.argwhere(errors < threshold).squeeze()
-    outliers = np.argwhere(errors >= threshold).squeeze()
+    inliers = np.argwhere(errors < threshold).flatten()
+    outliers = np.argwhere(errors >= threshold).flatten()
     return inliers, outliers
 
 
-def PNP_RANSAC(world_X, img_x, K, threshold=0.1, acc_thresh=0.85, max_iters=1000)->tuple[np.array, np.array, np.array, np.array]:
+def PNP_RANSAC(world_X, img_x, K, threshold=100, acc_thresh=0.85, max_iters=1000) -> tuple[
+    np.array, np.array, np.array, np.array]:
     """
     Perform PnP with RANSAC to estimate the camera pose.
     @ world_X: The homogenized  3D points in the shape of (n, 4)
@@ -63,7 +64,7 @@ def PNP_RANSAC(world_X, img_x, K, threshold=0.1, acc_thresh=0.85, max_iters=1000
         x_sample = img_x[idx]
         X_sample = world_X[idx]
         R, C = linear_PnP(K, x_sample, X_sample)
-        P = K @ np.hstack((R, -R @ C.reshape(3,1)))
+        P = K @ np.hstack((R, -R @ C.reshape(3, 1)))
         num_inliers = error_func(P, world_X, img_x, threshold)
         acc = num_inliers / num_features
         if acc > best_acc:

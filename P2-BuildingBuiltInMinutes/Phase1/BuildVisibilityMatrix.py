@@ -20,7 +20,7 @@ def buildVisibilityMatrix(C_matrices, R_matrices, K, world_X_points, img_x_point
         P = K @ np.hstack((R, -R @ C))
         # Calculate the reprojection error for each point
         x_hat = P @ world_X_points.T
-        x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
+        x_hat = x_hat / x_hat[:,2, np.newaxis]  # divide by the last row of P.T @ X
         diffs = img_x_points[i] - x_hat.T  # Shape: (n, 3)
         # Calculate the Euclidean distance of the reprojection error
         errors = np.linalg.norm(diffs, axis=1)  # Shape: (n,)

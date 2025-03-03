@@ -43,7 +43,7 @@ if __name__ == '__main__':
     for i in range(1, num_images):
         RANSAC_correspondences = []
         outliers_correspondences = []
-        for j in range(i + 1, num_images):
+        for j in range(i + 1, num_images + 1):
             correspondences = loadCorrespondences(i, j)
             _, inliers_ij, outliers = RANSAC(correspondences, threshold=thresh, acc_thresh=acc_thresh)
             RANSAC_correspondences.append(inliers_ij)
@@ -87,7 +87,10 @@ if __name__ == '__main__':
     if plot:
         plot_linear_triangulation(K, np.expand_dims(C,axis=0), np.expand_dims(R, axis=0), points1, points2)
     ##########################################################################################
-    optimized, _ = non_linear_triangulation(K, R0, C0, R, C, points1, points2, triangulated_points)
+    # Homogenize the 2D points to be an (n, 3) matrix
+    x1 = np.hstack((points1, np.ones((points1.shape[0], 1))))
+    x2 = np.hstack((points2, np.ones((points1.shape[0], 1))))
+    optimized, _ = non_linear_triangulation(K, R0, C0, R, C, x1, x2, triangulated_points)
     if plot:
         P1 = K @ np.hstack((R0, -C0))
         P2 = K @ np.hstack((R, -R @ C))
@@ -100,37 +103,40 @@ if __name__ == '__main__':
     C_set = [C]
     R_set = [R]
     world_points = optimized
-    for i in range(1, num_images + 1):
+    for i in range(1, num_images):
         img_i_correspondences = image_inliers[0][i]
+
         # Assuming img_i_correspondences and points1 are already defined
-        # Find the indices of elements in img_i_correspondences[:, :2] that are not in points1
-        indices = np.argwhere(~np.isin(img_i_correspondences[:, :2], points1).all(axis=1)).ravel()
-        # Get the world points that exist in the current image and the first image and then use this to make the correspondences
+        # Find the indices of elements in img_i_correspondences[:, :2] that are in points1
+        indices = np.argwhere(np.isin(img_i_correspondences[:, :2], points1).all(axis=1)).ravel()
+        # Get the world points that exist in the current image
+        # and the first image and then use this to make the correspondences
         pnp_world_points = img_X_x_matching[indices, 2:]
 
+        base_img_points = img_i_correspondences[indices, :2]
+        base_img_points = np.hstack((base_img_points, np.ones((base_img_points.shape[0], 1))))
         pnp_img_points = img_i_correspondences[indices, 2:]
         pnp_img_points = np.hstack((pnp_img_points, np.ones((pnp_img_points.shape[0], 1))))
-        base_img_points = img_i_correspondences[indices, :2]
 
-        C_pnp, R_pnp, inliers_pnp, outliers_pnp = PNP_RANSAC(pnp_world_points, pnp_img_points, K, threshold=0.1,
-                                                             acc_thresh=0.85, max_iters=1000)
+        C_pnp, R_pnp, inliers_pnp, outliers_pnp = PNP_RANSAC(pnp_world_points, pnp_img_points, K, threshold=100,
+                                                             acc_thresh=0.85, max_iters=10000)
         points = pnp_world_points[inliers_pnp]
         opt_points = pnp_img_points[inliers_pnp]
 
         C_pnp_opt, R_pnp_opt = nonlinearPnP(K, R_pnp, C_pnp, pnp_img_points, pnp_world_points)
 
-        P = K @ np.hstack((R_pnp_opt, -R_pnp_opt @ C_pnp_opt))
-        opt_points = np.hstack((opt_points, np.ones((opt_points.shape[0], 1))))
-        opt_points = P @ opt_points
 
-        plot_optimizations(C_pnp, C_pnp_opt, points, opt_points)
 
         C_set.append(C_pnp)
         R_set.append(R_pnp)
-        X_new = linearTriangulation(K, R0, C0, R_pnp_opt, C_pnp_opt, base_img_points, pnp_img_points)
-        X_new = non_linear_triangulation(K, R0, C0, R_pnp_opt, C_pnp_opt, base_img_points, pnp_img_points, X_new)
+        X_new = linearTriangulation(K, R0, C0, R_pnp_opt, C_pnp_opt, base_img_points, pnp_img_points[:, :2])
+        X_new, _ = non_linear_triangulation(K, R0, C0, R_pnp_opt, C_pnp_opt, base_img_points, pnp_img_points, X_new)
+        P_opt = K @ np.hstack((R_pnp_opt, -R_pnp_opt @ C_pnp_opt))
+        points_2d = (P_opt @ X_new.T).T
+        points_2d = points_2d / points_2d[:,2, np.newaxis]
 
-        img_X_x_matching = np.vstack((img_X_x_matching, np.hstack((base_img_points, X_new))))
+
+        img_X_x_matching = np.vstack((img_X_x_matching, np.hstack((points_2d[:,:2], X_new))))
         world_points = np.vstack((world_points, X_new))
 
         vis = buildVisibilityMatrix(C_set, R_set, K, world_points, image_inliers[0])

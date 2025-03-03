@@ -152,8 +152,8 @@ def plot_optimizations(C_old, C_new, points_old, points_new):
     ax.scatter(C_old[0], C_old[2], c='r', marker='x', label='Old Camera Center')
     ax.scatter(C_new[0], C_new[2], c='b', marker='x', label='New Camera Center')
     ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
+    ax.set_ylabel('Z')
+
     ax.set_title('Camera Center Optimization')
     ax.legend()
     plt.show()

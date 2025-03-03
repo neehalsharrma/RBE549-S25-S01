@@ -10,7 +10,7 @@ def calc_loss(x: np.array, P: np.array, X: np.array) -> float:
     @ return The loss for the non-linear triangulation, the shape is a (1, 3) vector.
     """
     x_hat = P @ X.T
-    x_hat = x_hat / x_hat[2]  # divide by the last row of P.T @ X
+    x_hat = x_hat / x_hat[:, 2, np.newaxis]  # divide by the last row of P.T @ X
     error = x - x_hat
     return np.linalg.norm(error)
 
@@ -62,19 +62,16 @@ def linear_PnP(K, points2D, points3D):
             A = a
 
     U, S, VT = np.linalg.svd(A)
-    P = VT.T[-1].reshape((3, 4))
+    P = VT.T[-1, :].reshape((3, 4))
     inv_K = np.linalg.inv(K)
 
-    R = inv_K @ P[:, :3] # inverse of K times the first 3 columns of P
+    R = inv_K @ P[:, :3]  # inverse of K times the first 3 columns of P
     # SVD cleanup of R
     UR, DR, VTR = np.linalg.svd(R)
     R = UR @ VTR
-    scale_factor = DR[0]
-
-    if np.linalg.det(R) == -1:
+    T = (inv_K @ P[:, -1])
+    if np.linalg.det(R) < 0:
         R = -R
-
-    T = (inv_K @ P[:, -1]) / scale_factor
     C = - R.T @ T
     return R, C
 
