@@ -13,7 +13,7 @@ import numpy as np
 from DisambiguateCameraPose import getCorrectPose
 from EssentialMatrixFromFundamentalMatrix import estimateE
 from ExtractCameraPose import extract_camera_pose
-from GetInliersRANSAC import RANSAC, showRANSAC
+from GetInliersRANSAC import RANSAC, show_RANSAC
 from LinearTriangulation import linearTriangulation
 from LoadData import load_calibration_matrix, load_image, load_correspondence
 from NonLinearTriangulation import non_linear_triangulation
@@ -38,7 +38,7 @@ def main() -> None:
         correspondences, threshold=0.125, acc_thresh=0.85
     )
     # Visualize the RANSAC results
-    showRANSAC(image1=1, image2=2, inliers=best_inliers, outliers=outliers)
+    show_RANSAC(image1=1, image2=2, inliers=best_inliers, outliers=outliers)
 
     # Extract the inlier points
     points1 = best_inliers[:, 0:2]
