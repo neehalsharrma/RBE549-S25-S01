@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from EstimateFundamentalMatrix import estimateF, estimateF_7pt
-from LoadData import loadImage
+from LoadData import load_image
 import concurrent.futures
 import threading
 

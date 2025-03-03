@@ -1,3 +1,12 @@
+"""
+This module performs 3D reconstruction from two images using Structure from Motion (SfM).
+
+Functions
+---------
+main() -> None
+    Main function to perform 3D reconstruction from two images.
+"""
+
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,7 +15,7 @@ from EssentialMatrixFromFundamentalMatrix import estimateE
 from ExtractCameraPose import extract_camera_pose
 from GetInliersRANSAC import RANSAC, showRANSAC
 from LinearTriangulation import linearTriangulation
-from LoadData import loadCalibrationMatrix, loadImage, loadCorrespondences
+from LoadData import load_calibration_matrix, load_image, load_correspondence
 from NonLinearTriangulation import non_linear_triangulation
 
 
@@ -15,21 +24,20 @@ def main() -> None:
     Main function to perform 3D reconstruction from two images.
     """
     # Load the calibration matrix
-    K = loadCalibrationMatrix()
+    K = load_calibration_matrix()
 
     # Load the images
-    img1 = loadImage(1)
-    img2 = loadImage(2)
+    img1 = load_image(1)
+    img2 = load_image(2)
 
     # Load the correspondences between the images
-    correspondences = loadCorrespondences(1, 2)
+    correspondences = load_correspondence(1, 2)
 
     # Perform RANSAC to find the best fundamental matrix and inliers
     F, best_inliers, outliers = RANSAC(
         correspondences, threshold=0.125, acc_thresh=0.85
     )
     # Visualize the RANSAC results
-    # Visualize the RANSAC results with image indices 1 and 2
     showRANSAC(image1=1, image2=2, inliers=best_inliers, outliers=outliers)
 
     # Extract the inlier points
@@ -47,7 +55,9 @@ def main() -> None:
     ax = fig.add_subplot(111)
     colors = ["r", "c", "b", "y"]
 
+    # Loop through each camera pose candidate
     for camera_index in range(C_out.shape[0]):
+        # Perform linear triangulation for the current camera pose
         points = linearTriangulation(
             K,
             np.eye(3),
@@ -57,16 +67,22 @@ def main() -> None:
             points1,
             points2,
         )
+        # Scatter plot the triangulated 3D points for the current camera pose
         ax.scatter(
             points[:, 0], points[:, 2], marker="o", label=f"Camera {camera_index + 1}", c=colors[camera_index]
         )
+        # Plot the camera position
         ax.plot(C_out[camera_index, 0], C_out[camera_index, 2], marker="x", color="k", markersize=10)
+    
+    # Plot the origin
     ax.plot([0], [0], marker="x", color="k", markersize=10)
 
+    # Set the labels and title for the plot
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_title("3D Reconstruction")
     ax.legend()
+    # Display the plot
     plt.show()
 
     # Disambiguate the correct camera pose
@@ -110,29 +126,47 @@ def main() -> None:
 
     # Reproject the points and draw circles for linear and non-linear triangulation
     for point_index in range(points1.shape[0]):
+        # Get the triangulated 3D point
         t_pt = triangulated_points[point_index]
+        
+        # Reproject the triangulated point onto the first image
         reproj_linear_1 = np.dot(P1, t_pt)
         reproj_linear_1 /= reproj_linear_1[2]
+        
+        # Reproject the triangulated point onto the second image
         reproj_linear_2 = np.dot(P2, t_pt)
         reproj_linear_2 /= reproj_linear_2[2]
+        
+        # Draw a green circle on the first image at the reprojected point location
         lin1 = cv2.circle(
             lin1, (int(reproj_linear_1[0]), int(reproj_linear_1[1])), 5, (0, 255, 0)
         )
+        
+        # Draw a green circle on the second image at the reprojected point location
         lin2 = cv2.circle(
             lin2, (int(reproj_linear_2[0]), int(reproj_linear_2[1])), 5, (0, 255, 0)
         )
 
+        # Get the optimized 3D point
         o_pt = optimized_points[point_index]
+        
+        # Reproject the optimized point onto the first image
         reproj_optimized_1 = np.dot(P1, o_pt)
         reproj_optimized_1 /= reproj_optimized_1[2]
+        
+        # Reproject the optimized point onto the second image
         reproj_optimized_2 = np.dot(P2, o_pt)
         reproj_optimized_2 /= reproj_optimized_2[2]
+        
+        # Draw a blue circle on the first image at the reprojected point location
         opt1 = cv2.circle(
             opt1,
             (int(reproj_optimized_1[0]), int(reproj_optimized_1[1])),
             5,
             (255, 0, 0),
         )
+        
+        # Draw a blue circle on the second image at the reprojected point location
         opt2 = cv2.circle(
             opt2,
             (int(reproj_optimized_2[0]), int(reproj_optimized_2[1])),

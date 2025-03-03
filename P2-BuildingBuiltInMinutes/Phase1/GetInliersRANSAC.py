@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from EstimateFundamentalMatrix import estimateF, estimateF_7pt
-from LoadData import loadImage
+from LoadData import load_image
 import concurrent.futures
 import threading
 
@@ -206,8 +206,8 @@ def showRANSAC(image1: int, image2: int, inliers: np.array, outliers: np.array, 
     @ img2: The second image.
     @ inliers: The inliers as an n x 4 array.
     """
-    img1 = loadImage(image1)
-    img2 = loadImage(image2)
+    img1 = load_image(image1)
+    img2 = load_image(image2)
     img = np.concatenate((img1, img2), axis=1)
     for i in range(inliers.shape[0]):
         # Hide some of the inliers to make the image easier to see
