@@ -14,7 +14,7 @@ from DisambiguateCameraPose import getCorrectPose
 from EssentialMatrixFromFundamentalMatrix import estimateE
 from ExtractCameraPose import extract_camera_pose
 from GetInliersRANSAC import RANSAC, show_RANSAC
-from LinearTriangulation import linearTriangulation
+from LinearTriangulation import linear_triangulation
 from LoadData import load_calibration_matrix, load_image, load_correspondence
 from NonLinearTriangulation import non_linear_triangulation
 
@@ -58,7 +58,7 @@ def main() -> None:
     # Loop through each camera pose candidate
     for camera_index in range(C_out.shape[0]):
         # Perform linear triangulation for the current camera pose
-        points = linearTriangulation(
+        points = linear_triangulation(
             K,
             np.eye(3),
             np.zeros((3, 1)),
@@ -95,7 +95,7 @@ def main() -> None:
     P2 = K @ R @ np.hstack((np.eye(3), -C))
 
     # Perform linear triangulation with the correct pose
-    triangulated_points = linearTriangulation(
+    triangulated_points = linear_triangulation(
         K, np.eye(3), np.zeros((3, 1)), R, C, points1, points2
     )
     # Plot the triangulated 3D points
