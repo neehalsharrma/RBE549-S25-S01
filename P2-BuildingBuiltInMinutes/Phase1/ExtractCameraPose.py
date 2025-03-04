@@ -13,6 +13,8 @@ extract_camera_pose(essential: np.array) -> tuple[np.array, np.array]
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import sys
+sys.dont_write_bytecode = True
 
 
 def extract_camera_pose(essential: np.array) -> tuple[np.array, np.array]:

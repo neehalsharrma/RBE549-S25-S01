@@ -13,6 +13,8 @@ get_correct_pose(K, C_out, R_out, points1, points2)
 
 import numpy as np
 from LinearTriangulation import linearTriangulation
+import sys
+sys.dont_write_bytecode = True
 
 def get_correct_pose(K, C_out: np.array, R_out: np.array, points1: np.array, points2: np.array):
     """

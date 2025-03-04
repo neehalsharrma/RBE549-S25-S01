@@ -6,6 +6,8 @@ whether a 3D point is visible from a given camera.
 """
 
 import numpy as np
+import sys
+sys.dont_write_bytecode = True
 
 def build_visibility_matrix(C_matrices, R_matrices, K, world_X_points, img_x_points) -> np.array:
     """

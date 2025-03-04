@@ -15,6 +15,8 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.sparse import lil_matrix
 from scipy.spatial.transform import Rotation
+import sys
+sys.dont_write_bytecode = True
 
 
 def bundle_adjustment(

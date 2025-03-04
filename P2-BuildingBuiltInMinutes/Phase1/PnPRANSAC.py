@@ -15,6 +15,9 @@ PNP_RANSAC(world_X, img_x, K, threshold=100, acc_thresh=0.85, max_iters=1000)
     Perform PnP with RANSAC to estimate the camera pose.
 """
 
+import sys
+sys.dont_write_bytecode = True
+
 import numpy as np
 from LinearPnp import linear_PnP
 

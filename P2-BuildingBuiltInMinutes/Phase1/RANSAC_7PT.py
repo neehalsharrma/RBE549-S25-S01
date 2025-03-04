@@ -18,6 +18,9 @@ RANSAC_7pt(correspondences, threshold=5, acc_thresh=0.85)
 import time
 import numpy as np
 from EstimateFundamentalMatrix import estimate_F, estimate_F_7pt
+import sys
+
+sys.dont_write_bytecode = True
 
 
 def normalization_matrix(points):

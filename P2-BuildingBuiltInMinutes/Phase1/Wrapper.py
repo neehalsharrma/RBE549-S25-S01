@@ -1,5 +1,9 @@
 # Create Your Own Starter Code :)
 import argparse
+import sys
+import os
+
+sys.dont_write_bytecode = True
 
 import numpy as np
 from BuildVisibilityMatrix import build_visibility_matrix

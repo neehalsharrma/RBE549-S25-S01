@@ -19,6 +19,8 @@ PnPRansac(K, points2D, points3D, threshold, acc_thresh)
 """
 
 import numpy as np
+import sys
+sys.dont_write_bytecode = True
 
 
 def calc_loss(x: np.array, P: np.array, X: np.array) -> float:

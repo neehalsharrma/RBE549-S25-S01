@@ -22,6 +22,9 @@ show_matches2(image1, image2, points1, points2)
     Display the matches between two images using provided points.
 """
 
+import sys
+sys.dont_write_bytecode = True
+
 from encodings import utf_8
 import numpy as np
 import cv2

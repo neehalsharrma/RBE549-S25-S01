@@ -17,6 +17,9 @@ non_linear_triangulation(K: np.array, R1: np.array, C1: np.array, R2: np.array, 
     Perform non-linear triangulation to estimate the 3D points.
 """
 
+import sys
+sys.dont_write_bytecode = True
+
 import numpy as np
 import scipy
 

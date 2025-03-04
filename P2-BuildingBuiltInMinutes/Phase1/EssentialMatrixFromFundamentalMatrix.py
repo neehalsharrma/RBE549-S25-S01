@@ -6,6 +6,9 @@ Fundamental Matrix and the Calibration Matrix using the relationship between
 them. The Essential Matrix is then enforced to have rank 2.
 """
 
+import sys
+sys.dont_write_bytecode = True
+
 import numpy as np
 
 

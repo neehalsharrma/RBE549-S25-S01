@@ -21,6 +21,8 @@ plot_epipolar_lines(F, points1, points2, img1, img2)
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import sys
+sys.dont_write_bytecode = True
 
 def getEquation(Point1, Point2):
     """

@@ -25,6 +25,8 @@ import cv2
 from EstimateFundamentalMatrix import estimate_F
 import concurrent.futures
 import threading
+import sys
+sys.dont_write_bytecode = True
 
 
 def normalization_matrix(points: np.array) -> np.array:

@@ -14,6 +14,8 @@ linearTriangulation2(K, R1, C1, R2, C2, points1, points2)
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.dont_write_bytecode = True
 
 
 def linearTriangulation(K, R1, C1, R2, C2, points1, points2):

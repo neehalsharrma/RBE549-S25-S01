@@ -14,6 +14,9 @@ import numpy as np
 from numpy import floating
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
+import sys
+
+sys.dont_write_bytecode = True
 
 
 def nonlinear_PnP(K, R1, C1, img_x, world_X):

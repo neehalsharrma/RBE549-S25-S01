@@ -30,6 +30,8 @@ import cv2
 from Utils.LoadData import load_image
 from LinearTriangulation import linearTriangulation
 import os
+import sys
+sys.dont_write_bytecode = True
 
 
 def show_RANSAC(
