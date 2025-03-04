@@ -1,22 +1,62 @@
+"""
+Module for estimating the Fundamental Matrix and plotting epipolar lines.
+
+This module provides functions to estimate the Fundamental Matrix from point correspondences
+between two images, estimate the epipole, and plot the epipolar lines on the images.
+
+Functions
+---------
+getEquation(Point1, Point2)
+    Construct the equation for the Fundamental Matrix estimation.
+estimate_F(points1, points2)
+    Estimate the Fundamental Matrix from the given points.
+estimate_F_7pt(points1, points2)
+    Estimate the Fundamental Matrix using the 7-point algorithm.
+estimate_epipole(F)
+    Estimate the epipole from the Fundamental Matrix.
+plot_epipolar_lines(F, points1, points2, img1, img2)
+    Plot the epipolar lines on the images.
+"""
+
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-
 def getEquation(Point1, Point2):
+    """
+    Construct the equation for the Fundamental Matrix estimation.
+
+    Parameters
+    ----------
+    Point1 : array-like
+        The coordinates of the point in the first image (x1, y1).
+    Point2 : array-like
+        The coordinates of the point in the second image (x2, y2).
+
+    Returns
+    -------
+    numpy.ndarray
+        The equation coefficients as a 1D array.
+    """
     x1, y1 = Point1
     x2, y2 = Point2
     return np.array([x1 * x2, y1 * x2, x2, x1 * y2, y1 * y2, y2, x1, y1, 1])
 
-
-# Assuming Points 1 to be np array of shape (n, 2) and Points 2 to be np array of shape (n, 2)
-# Returns the estimated Fundamental Matrix
-def estimateF(points1, points2):
+def estimate_F(points1, points2):
     """
     Estimate the Fundamental Matrix from the given points.
-    @ Points1: The points from the first image in the shape of (n, 3)
-    @ Points2: The points from the second image.in the shape of (n, 3)
-    @ return: The estimated Fundamental Matrix.
+
+    Parameters
+    ----------
+    points1 : numpy.ndarray
+        The points from the first image in the shape of (n, 2).
+    points2 : numpy.ndarray
+        The points from the second image in the shape of (n, 2).
+
+    Returns
+    -------
+    numpy.ndarray
+        The estimated Fundamental Matrix.
     """
     n = points1.shape[0]
     A = np.zeros((n, 9))
@@ -33,15 +73,21 @@ def estimateF(points1, points2):
 
     return F
 
-
-# Assuming Points 1 to be np array of shape (n, 2) and Points 2 to be np array of shape (n, 2)
-# Returns the estimated Fundamental Matrix
-def estimateF_7pt(points1, points2):
+def estimate_F_7pt(points1, points2):
     """
-    Estimate the Fundamental Matrix from the given points.
-    @ Points1: The points from the first image in the shape of (n, 2)
-    @ Points2: The points from the second image.in the shape of (n, 2)
-    @ return: The estimated Fundamental Matrix. Either 3x3 or 3x3xN
+    Estimate the Fundamental Matrix using the 7-point algorithm.
+
+    Parameters
+    ----------
+    points1 : numpy.ndarray
+        The points from the first image in the shape of (n, 2).
+    points2 : numpy.ndarray
+        The points from the second image in the shape of (n, 2).
+
+    Returns
+    -------
+    numpy.ndarray
+        The estimated Fundamental Matrix. Either 3x3 or 3x3xN.
     """
     n = points1.shape[0]
     A = np.zeros((n, 9))
@@ -67,32 +113,42 @@ def estimateF_7pt(points1, points2):
         F = F.reshape(3, 3, 1)
     return F
 
-
 def estimate_epipole(F):
-    '''
-       Inputs:
-           Fundamental Matrix F
-       Outputs:
-           Epipole
+    """
+    Estimate the epipole from the Fundamental Matrix.
 
-       Since epilines should pass through the epipole estimate epipole using the formula: F @ e = 0
-       '''
+    Parameters
+    ----------
+    F : numpy.ndarray
+        The Fundamental Matrix.
+
+    Returns
+    -------
+    numpy.ndarray
+        The epipole coordinates.
+    """
     _, _, V = np.linalg.svd(F)
     e = V[-1, :]
     e /= e[-1]
     return e
 
-
 def plot_epipolar_lines(F, points1, points2, img1, img2):
     """
     Plot the epipolar lines on the images.
-    @ F: The Fundamental Matrix.
-    @ points1: The points from the first image in the shape of (n, 2)
-    @ points2: The points from the second image in the shape of (n, 2)
-    @ img1: The first image.
-    @ img2: The second image.
-    """
 
+    Parameters
+    ----------
+    F : numpy.ndarray
+        The Fundamental Matrix.
+    points1 : numpy.ndarray
+        The points from the first image in the shape of (n, 2).
+    points2 : numpy.ndarray
+        The points from the second image in the shape of (n, 2).
+    img1 : numpy.ndarray
+        The first image.
+    img2 : numpy.ndarray
+        The second image.
+    """
     e1 = estimate_epipole(F)
     e2 = estimate_epipole(F.T)
     for pt in points1:
@@ -107,3 +163,9 @@ def plot_epipolar_lines(F, points1, points2, img1, img2):
     plt.axis('off')
     plt.title('Epipolar Lines')
     plt.show()
+    output_dir = '/home/wpi/RBE549-S25-S01/P2-BuildingBuiltInMinutes/Phase1/Outputs/'
+    plt.savefig(output_dir + 'epipolar_lines_img1.png')
+    plt.imshow(i2)
+    plt.axis('off')
+    plt.title('Epipolar Lines')
+    plt.savefig(output_dir + 'epipolar_lines_img2.png')
