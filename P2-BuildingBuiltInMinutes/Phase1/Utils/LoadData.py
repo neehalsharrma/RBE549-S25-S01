@@ -4,19 +4,19 @@ calibration matrices, and feature matches for Structure from Motion (SfM) tasks.
 
 Functions
 ---------
-load_image(img, data_path='P2Data/')
+load_image(img, data_path='Data/')
     Load an image from the specified path and return it as a NumPy array.
-load_calibration_matrix(data_path='P2Data/')
+load_calibration_matrix(data_path='Data/')
     Load the calibration matrix from the specified path and return it as a NumPy array.
-load_data_full(img, data_path='P2Data/', num_images=5)
+load_data_full(img, data_path='Data/', num_images=5)
     Load the full data for an image and return the number of matches and the data as a tuple.
-load_data_sparse(img_num, data_path='P2Data/', num_images=5)
+load_data_sparse(img_num, data_path='Data/', num_images=5)
     Load the sparse data for an image and return it as a NumPy array.
-load_correspondences(image1, image2, data_path='P2Data/', num_images=5)
+load_correspondences(image1, image2, data_path='Data/', num_images=5)
     Load the correspondences between two images and return them as a NumPy array.
 show_features(points, img1)
     Display the features on the specified image.
-show_matches(image1, image2, data_path='P2Data/')
+show_matches(image1, image2, data_path='Data/')
     Display the matches between two images.
 show_matches2(image1, image2, points1, points2)
     Display the matches between two images using provided points.
@@ -31,7 +31,7 @@ import cv2
 import matplotlib.pyplot as plt
 
 
-def load_image(img: int, data_path: str = "P2Data/") -> np.ndarray:
+def load_image(img: int, data_path: str = "Data/") -> np.ndarray:
     """
     Load the image from the given path and return the image as a NumPy array.
 
@@ -40,7 +40,7 @@ def load_image(img: int, data_path: str = "P2Data/") -> np.ndarray:
     img : int
         The image number to load.
     data_path : str, optional
-        The path to the data directory (default is 'P2Data/').
+        The path to the data directory (default is 'Data/').
 
     Returns
     -------
@@ -56,14 +56,14 @@ def load_image(img: int, data_path: str = "P2Data/") -> np.ndarray:
     return img
 
 
-def load_calibration_matrix(data_path: str = "P2Data/") -> np.ndarray:
+def load_calibration_matrix(data_path: str = "Data/") -> np.ndarray:
     """
     Load the calibration matrix from the given path and return the calibration matrix as a NumPy array.
 
     Parameters
     ----------
     data_path : str, optional
-        The relative path to the data directory (default is 'P2Data/').
+        The relative path to the data directory (default is 'Data/').
 
     Returns
     -------
@@ -85,7 +85,7 @@ def load_calibration_matrix(data_path: str = "P2Data/") -> np.ndarray:
 
 
 def load_data_full(
-    img: int, data_path: str = "P2Data/", num_images: int = 5
+    img: int, data_path: str = "Data/", num_images: int = 5
 ) -> tuple[int, np.ndarray]:
     """
     Load the data from the given path and return the data as a tuple.
@@ -95,7 +95,7 @@ def load_data_full(
     img : int
         The image number to load.
     data_path : str, optional
-        The path to the data directory (default is 'P2Data/').
+        The path to the data directory (default is 'Data/').
     num_images : int, optional
         The number of images to be used in the SfM matching (default is 5).
 
@@ -125,7 +125,7 @@ def load_data_full(
 
 
 def load_data_sparse(
-    img_num: int, data_path: str = "P2Data/", num_images: int = 5
+    img_num: int, data_path: str = "Data/", num_images: int = 5
 ) -> np.ndarray:
     """
     Load the data from the given path and return the data as a sparse matrix.
@@ -135,7 +135,7 @@ def load_data_sparse(
     img_num : int
         The image number to load.
     data_path : str, optional
-        The path to the data directory (default is 'P2Data/').
+        The path to the data directory (default is 'Data/').
     num_images : int, optional
         The number of images to be used in the SfM matching (default is 5).
 
@@ -169,7 +169,7 @@ def load_data_sparse(
 
 
 def load_correspondences(
-    image1: int, image2: int, data_path: str = "P2Data/", num_images: int = 5
+    image1: int, image2: int, data_path: str = "Data/", num_images: int = 5
 ) -> np.ndarray:
     """
     Load the correspondences between two images from the given path and return the data as a NumPy array.
@@ -181,7 +181,7 @@ def load_correspondences(
     image2 : int
         The second image number for correspondences.
     data_path : str, optional
-        The path to the data directory (default is 'P2Data/').
+        The path to the data directory (default is 'Data/').
     num_images : int, optional
         The number of images to be used in the SfM matching (default is 5).
 
@@ -234,7 +234,7 @@ def show_features(points, img1):
     plt.show()
 
 
-def show_matches(image1: int, image2: int, data_path: str = "P2Data/"):
+def show_matches(image1: int, image2: int, data_path: str = "Data/"):
     """
     Display the matches between two images.
 
@@ -245,7 +245,7 @@ def show_matches(image1: int, image2: int, data_path: str = "P2Data/"):
     image2 : int
         The second image number.
     data_path : str, optional
-        The path to the data directory (default is 'P2Data/').
+        The path to the data directory (default is 'Data/').
     """
     # Load the images
     img1 = load_image(image1)
@@ -269,7 +269,7 @@ def show_matches(image1: int, image2: int, data_path: str = "P2Data/"):
     plt.axis("off")
     plt.show()
     # Save the image with matches to the Outputs directory
-    output_path = "Outputs/matches_" + str(image1) + "_" + str(image2) + ".png"
+    output_path = "Data/IntermediateOutputImages/matches_" + str(image1) + "_" + str(image2) + ".png"
     plt.savefig(output_path)
 
 
@@ -309,5 +309,5 @@ def show_matches2(image1: int, image2: int, points1: np.array, points2: np.array
     plt.axis("off")
     plt.show()
     # Save the image with matches to the Outputs directory
-    output_path = "Outputs/matches_" + str(image1) + "_" + str(image2) + ".png"
+    output_path = "Data/IntermediateOutputImages/matches_" + str(image1) + "_" + str(image2) + ".png"
     plt.savefig(output_path)

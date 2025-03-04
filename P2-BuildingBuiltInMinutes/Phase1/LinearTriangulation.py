@@ -128,7 +128,7 @@ def see_triangulation(Points):
     plt.show()
 
     # Save the plot to a file
-    plt.savefig('Outputs/triangulation_plot.png')
+    plt.savefig('Data/IntermediateOutputImages/triangulation_plot.png')
 
 
 def linearTriangulation2(K, R1, C1, R2, C2, points1, points2):

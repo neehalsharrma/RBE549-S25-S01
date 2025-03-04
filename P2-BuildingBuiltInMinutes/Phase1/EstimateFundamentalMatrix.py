@@ -165,7 +165,7 @@ def plot_epipolar_lines(F, points1, points2, img1, img2):
     plt.axis('off')
     plt.title('Epipolar Lines')
     plt.show()
-    output_dir = '/home/wpi/RBE549-S25-S01/P2-BuildingBuiltInMinutes/Phase1/Outputs/'
+    output_dir = 'Data/IntermediateOutputImages/'
     plt.savefig(output_dir + 'epipolar_lines_img1.png')
     plt.imshow(i2)
     plt.axis('off')

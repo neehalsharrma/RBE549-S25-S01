@@ -1,6 +1,6 @@
-# Phase 1: Building Built In Minutes
+# Project 2 Phase 1: Building Built In Minutes
 
-This folder contains the implementation of various computer vision algorithms for 3D reconstruction, including linear triangulation, PnP, RANSAC, and bundle adjustment.
+This folder contains the implementation of Structure from Motion (SfM)
 
 ## Setup Instructions
 

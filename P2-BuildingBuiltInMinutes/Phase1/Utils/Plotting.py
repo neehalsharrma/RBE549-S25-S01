@@ -5,13 +5,13 @@ bundle adjustment, and the final 3D reconstruction.
 
 Functions
 ---------
-show_RANSAC(image1, image2, inliers, outliers, save=True, save_path='Outputs/', title=None)
+show_RANSAC(image1, image2, inliers, outliers, save=True, save_path='Data/IntermediateOutputImages/', title=None)
     Display the images with the inliers and outliers.
 
-plot_linear_triangulation(K, C_out, R_out, points1, points2, save_path='Outputs/', save=True)
+plot_linear_triangulation(K, C_out, R_out, points1, points2, save_path='Data/IntermediateOutputImages/', save=True)
     Plot linear triangulation points on a plane.
 
-plot_non_linear_triangulation(img1, img2, P1, P2, optimized, linear, img_points, save_path='Outputs/', save=True)
+plot_non_linear_triangulation(img1, img2, P1, P2, optimized, linear, img_points, save_path='Data/IntermediateOutputImages/', save=True)
     Plot non-linear triangulation points on a plane.
 
 plot_optimizations(C_old, C_new, points_old, points_new)
@@ -40,7 +40,7 @@ def show_RANSAC(
     inliers: np.array,
     outliers: np.array,
     save: bool = True,
-    save_path: str = "Outputs/",
+    save_path: str = "Data/IntermediateOutputImages/",
     title=None,
 ) -> None:
     """
@@ -59,7 +59,7 @@ def show_RANSAC(
     save : bool, optional
         Whether to save the plot (default is True).
     save_path : str, optional
-        The path to save the plot (default is 'Outputs/').
+        The path to save the plot (default is 'Data/IntermediateOutputImages/').
     title : str, optional
         The title of the plot (default is None).
 
@@ -113,7 +113,7 @@ def show_RANSAC(
 
 
 def plot_linear_triangulation(
-    K, C_out, R_out, points1, points2, save_path: str = "Outputs/", save: bool = True
+    K, C_out, R_out, points1, points2, save_path: str = "Data/IntermediateOutputImages/", save: bool = True
 ) -> None:
     """
     Plot linear triangulation points on a plane.
@@ -131,7 +131,7 @@ def plot_linear_triangulation(
     points2 : np.array
         The points from the second image in the shape of (n, 3).
     save_path : str, optional
-        The path to save the plot (default is 'Outputs/').
+        The path to save the plot (default is 'Data/IntermediateOutputImages/').
     save : bool, optional
         Whether to save the plot (default is True).
 
@@ -177,7 +177,7 @@ def plot_non_linear_triangulation(
     optimized: np.array,
     linear: np.array,
     img_points: np.array,
-    save_path: str = "Outputs/",
+    save_path: str = "Data/IntermediateOutputImages/",
     save: bool = True,
 ) -> None:
     """
@@ -200,7 +200,7 @@ def plot_non_linear_triangulation(
     img_points : np.array
         The image points in the shape of (n, 4).
     save_path : str, optional
-        The path to save the plot (default is 'Outputs/').
+        The path to save the plot (default is 'Data/IntermediateOutputImages/').
     save : bool, optional
         Whether to save the plot (default is True).
 
