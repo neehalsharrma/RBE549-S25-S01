@@ -58,29 +58,30 @@ class NeRFmodel(nn.Module):
         """
         super(NeRFmodel, self).__init__()
 
-        self.fc_input_dim = 3 + 3 * 2 * embed_pos_levels
-        self.fc_feat_input_dim = 3 + 3 * 2 * embed_dir_levels
+        # Calculate input dimensions for positional encoding
+        self.fc_input_dim = 3 + 3 * 2 * embed_pos_levels  # For spatial coordinates
+        self.fc_feat_input_dim = 3 + 3 * 2 * embed_dir_levels  # For viewing directions
 
-        # Define the MLP
+        # Define the MLP for spatial coordinates
         self.layers = nn.ModuleList()
         for i in range(8):
+            # First layer takes positional encoding as input
             in_features = self.fc_input_dim if i == 0 else hidden_layer_size
-            if i in [4]:
+            # Skip connection at layer 4
+            if i == 4:
                 in_features += self.fc_input_dim
-
-            if i in [7]:
-                out_features = hidden_layer_size + 1
-            else:
-                out_features = hidden_layer_size
+            # Last layer outputs density (sigma) and features
+            out_features = hidden_layer_size + 1 if i == 7 else hidden_layer_size
             self.layers.append(nn.Linear(in_features, out_features))
 
+        # Define the feature layer for combining spatial and directional features
         self.feature_layer = nn.Linear(
             hidden_layer_size + self.fc_feat_input_dim, hidden_layer_size // 2
         )
-        # Output layer
+        # Output layer for predicting RGB color values
         self.rgb_layer = nn.Linear(hidden_layer_size // 2, 3)
 
-        # Store the positional encoding length
+        # Store the positional encoding levels
         self.embed_pos_levels = embed_pos_levels
         self.embed_dir_levels = embed_dir_levels
 
@@ -100,11 +101,13 @@ class NeRFmodel(nn.Module):
         torch.Tensor
             Positional encoded tensor of shape (..., 3 + 3 * 2 * num_levels).
         """
+        # Initialize the encoded tensor with the original inputs
         encoded = [inputs]
+        # Append sine and cosine functions of the inputs for each level
         for i in range(num_levels):
             encoded.append(torch.sin(2**i * np.pi * inputs))
             encoded.append(torch.cos(2**i * np.pi * inputs))
-
+        # Concatenate all encoded components along the last dimension
         encoded_tensor = torch.cat(encoded, dim=-1)
         return encoded_tensor
 
@@ -129,17 +132,24 @@ class NeRFmodel(nn.Module):
         # Positional encoding for spatial coordinates
         encoded_positions = self.position_encoding(positions, self.embed_pos_levels)
         x = encoded_positions
+
+        # Pass through the spatial coordinate MLP
         for i, layer in enumerate(self.layers):
+            # Add skip connection at layer 4
             if i == 4:
                 x = torch.cat([x, encoded_positions], -1)
             x = F.relu(layer(x))
-        
+
+        # Separate density (sigma) and features
         sigma, x = x[..., -1], x[..., :-1]
 
         # Positional encoding for viewing directions
         encoded_directions = self.position_encoding(directions, self.embed_dir_levels)
+        # Combine spatial features and directional features
         x = torch.cat([x, encoded_directions], -1)
         x = F.relu(self.feature_layer(x))
+        # Predict RGB color values
         x = self.rgb_layer(x)
 
+        # Apply sigmoid activation to RGB values and return
         return torch.sigmoid(x), sigma
