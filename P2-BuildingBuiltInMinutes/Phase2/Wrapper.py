@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import os
 
 from NeRFModel import *
+from DataLoader import *
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
@@ -23,6 +24,7 @@ def loadDataset(data_path, mode):
         images: images
         pose: corresponding camera pose in world frame
     """
+    return DataLoader(data_path).loadDataset(mode)
 
 def PixelToRay(camera_info, pose, pixelPosition, args):
     """

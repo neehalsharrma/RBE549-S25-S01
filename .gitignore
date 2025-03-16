@@ -1,4 +1,5 @@
 # Ignoring data file
+P2-BuildingBuiltInMinutes/Phase2/nerf_synthetic/
 P1-MyAutoPano/Phase2/Data/
 HW1-MyAutoCalib/Data/
 .vscode
