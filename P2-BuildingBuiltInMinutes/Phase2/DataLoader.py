@@ -1,3 +1,16 @@
+"""
+DataLoader Module
+
+This module provides the DataLoader class, which is used to load and process datasets
+for Neural Radiance Fields (NeRF). It reads image data, camera poses, and camera
+parameters from a specified dataset directory.
+
+Classes
+-------
+DataLoader
+    A class to load and process datasets for NeRF.
+"""
+
 import os
 import json
 import numpy as np
@@ -5,56 +18,83 @@ import cv2
 
 
 class DataLoader:
-    def __init__(self, data_path= "nerf_synthetic/lego"):
+    """
+    A class to load and process datasets for NeRF (Neural Radiance Fields).
+
+    Attributes
+    ----------
+    data_path : str
+        Path to the dataset directory.
+
+    Methods
+    -------
+    loadDataset(mode):
+        Loads the dataset for the specified mode (train or test).
+    """
+
+    def __init__(self, data_path="nerf_synthetic/lego"):
+        """
+        Initializes the DataLoader with the dataset path.
+
+        Parameters
+        ----------
+        data_path : str, optional
+            Path to the dataset directory (default is "nerf_synthetic/lego").
+        """
         self.data_path = data_path
 
     def loadDataset(self, mode):
         """
-        Input:
-            data_path: dataset path
-            mode: train or test
-        Outputs:
-            camera_info: image width, height, focus
-            images: images
-            pose: corresponding camera pose in world frame
-        """
-        image_base_path= self.data_path + "/" 
-        jsonfile_path= self.data_path + "/transforms_"+ mode +".json"
+        Loads the dataset for the specified mode (train or test).
 
+        Parameters
+        ----------
+        mode : str
+            Mode of the dataset to load, either "train" or "test".
+
+        Returns
+        -------
+        tuple
+            A tuple containing:
+            - images (numpy.ndarray): Array of loaded images.
+            - poses (numpy.ndarray): Array of corresponding camera poses in the world frame.
+            - camera_info (list): List containing image width, height, and focal length.
+        """
+        # Construct paths for images and JSON metadata
+        image_base_path = self.data_path + "/"
+        jsonfile_path = self.data_path + "/transforms_" + mode + ".json"
+
+        # Load JSON metadata
         with open(jsonfile_path) as jsonfile:
             data = json.load(jsonfile)
 
-        camera_angle_x= data["camera_angle_x"]
-        images= []
-        poses= []
+        # Extract camera angle
+        camera_angle_x = data["camera_angle_x"]
+        images = []  # List to store images
+        poses = []  # List to store camera poses
 
-        for i in range(len(data["frames"])): 
-            frame= data["frames"][i]
-            image_path= os.path.join(image_base_path, frame["file_path"]+".png")
-            img= cv2.imread(image_path)
+        # Iterate through frames in the JSON file
+        for i in range(len(data["frames"])):
+            frame = data["frames"][i]
+            # Construct the full image path
+            image_path = os.path.join(image_base_path, frame["file_path"] + ".png")
+            # Read the image using OpenCV
+            img = cv2.imread(image_path)
             images.append(img)
-            pose= frame["transform_matrix"]
+            # Extract the transformation matrix (camera pose)
+            pose = frame["transform_matrix"]
             poses.append(pose)
 
-        images= np.array(images)
-        poses= np.array(poses)
+        # Convert lists to numpy arrays
+        images = np.array(images)
+        poses = np.array(poses)
 
-        # shape returns height, width, channel (so select first two)
-        H,W= images[0].shape[:2]
+        # Extract image dimensions (height and width)
+        H, W = images[0].shape[:2]
+        # Compute the focal length using the camera angle
         focal = 0.5 * W / np.tan(0.5 * camera_angle_x)
 
-        # Assuming the same camera is being used for every image, the H,W and focal length will be the same for all images 
-        camera_info= [W, H,focal]
-        return images, poses, camera_info
-        
+        # Assuming the same camera is used for all images, H, W, and focal length are constant
+        camera_info = [W, H, focal]
 
-# For Testing 
-# if __name__ == "__main__":
-#     # load data
-#     print("Loading data...")
-#     DataLoader= DataLoader()
-#     images, poses, camera_info = DataLoader.loadDataset("train")
-#     print("Printing camera info")
-#     print(camera_info)
-#     print("Poses", poses)
-#     print(len(images), len(poses))
+        return images, poses, camera_info
