@@ -1,3 +1,4 @@
+#!/usr/bin/evn python
 """
 Wrapper.py
 
@@ -99,29 +100,48 @@ def PixelToRay(camera_info, pose, pixelPosition, near, far, args):
         ray_direction : torch.Tensor
             The normalized direction of the ray in 3D space.
     """
-    # Unpack camera information
-    W, H, focal = camera_info
-    x, y = pixelPosition
+    # Ensure pose is a PyTorch tensor
+    pose = torch.tensor(pose, dtype=torch.float32, device=device)
+    H, W, focal = camera_info
+
+    # Generate meshgrid for pixel coordinates
+    mesh_x, mesh_y = torch.meshgrid(
+        torch.linspace(0, W - 1, W).to(device),
+        torch.linspace(0, H - 1, H).to(device),
+        indexing="ij",
+    )
 
     # Normalize pixel coordinates to camera space
-    # The x and y coordinates are shifted to the camera's center and scaled by the focal length
-    norm_x = (x - W * 0.5) / focal
-    norm_y = (y - H * 0.5) / focal
+    x = (mesh_x - W / 2) / focal
+    y = (mesh_y - H / 2) / focal
 
-    # Create a direction vector in the camera's local coordinate system
-    # The z-axis is assumed to point forward in the camera's view
-    direction = torch.tensor([norm_x, -norm_y, 1.0], dtype=torch.float32).to(device)
+    # Create direction vectors in the camera's local coordinate system
+    directions = torch.stack((x, -y, -torch.ones_like(x)), dim=-1)
 
     # Extract rotation (R) and translation (T) components from the camera pose
-    rotation = pose[:3, :3]  # 3x3 rotation matrix
-    translation = pose[:3, 3]  # 3D translation vector
+    rotation = pose[:3, :3]
+    translation = pose[:3, -1].view(1, 1, 3)
+
+    # Transform the direction vectors from camera space to world space
+    ray_direction = torch.sum(directions[..., None, :] * rotation, dim=-1)
+    ray_direction = ray_direction / torch.linalg.norm(ray_direction, dim=-1, keepdim=True)
+
+    # The ray's origin is the camera's position in the world frame
+    ray_origin = translation.expand(ray_direction.shape[0], ray_direction.shape[1], -1)
+
+    x, y = pixelPosition
+    x = (x - W / 2) / focal
+    y = (y - H / 2) / focal
+
+    # Create direction vector for the single pixel in the camera's local coordinate system
+    direction = torch.tensor([x, -y, -1.0], dtype=torch.float32, device=device)
 
     # Transform the direction vector from camera space to world space
     ray_direction = torch.matmul(rotation, direction)
-    ray_direction = ray_direction / torch.norm(ray_direction)  # Normalize the direction vector
+    ray_direction = ray_direction / torch.linalg.norm(ray_direction)
 
     # The ray's origin is the camera's position in the world frame
-    ray_origin = translation
+    ray_origin = translation.squeeze()
 
     return ray_origin, ray_direction
 
@@ -203,30 +223,25 @@ def generateBatch(images, poses, camera_info, args):
 
     # Sample random pixels from the image
     n_rays = args.n_rays_batch
-    rays_o = np.zeros((n_rays, 3))
-    rays_d = np.zeros((n_rays, 3))
-    rgb_gt = np.zeros((n_rays, 3))
+    x_coords = torch.randint(0, W, (n_rays,), device=device)
+    y_coords = torch.randint(0, H, (n_rays,), device=device)
 
-    # Generate random pixel coordinates
-    x_coords = np.random.randint(0, W, size=n_rays)
-    y_coords = np.random.randint(0, H, size=n_rays)
+    # Initialize tensors for rays and ground truth RGB values
+    rays_o = torch.zeros((n_rays, 3), dtype=torch.float32, device=device)
+    rays_d = torch.zeros((n_rays, 3), dtype=torch.float32, device=device)
+    rgb_gt = torch.zeros((n_rays, 3), dtype=torch.float32, device=device)
 
     # Generate rays for each sampled pixel
     for i in range(n_rays):
         # Get ray origin and direction for this pixel
         ray_o, ray_d = PixelToRay(
-            camera_info, pose, (x_coords[i], y_coords[i]), 0, 0, args
+            camera_info, pose, (x_coords[i].item(), y_coords[i].item()), 0, 0, args
         )
         rays_o[i] = ray_o
         rays_d[i] = ray_d
 
         # Get ground truth RGB value for this pixel
-        rgb_gt[i] = image[y_coords[i], x_coords[i]]
-
-    # Convert to torch tensors
-    rays_o = torch.tensor(rays_o, dtype=torch.float32).to(device)
-    rays_d = torch.tensor(rays_d, dtype=torch.float32).to(device)
-    rgb_gt = torch.tensor(rgb_gt, dtype=torch.float32).to(device)
+        rgb_gt[i] = torch.tensor(image[y_coords[i], x_coords[i]], dtype=torch.float32, device=device)
 
     return rays_o, rays_d, rgb_gt
 
@@ -614,7 +629,7 @@ def configParser():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data_path", default="nerf_synthetic/lego", help="dataset path"
+        "--data_path", default="lego", help="dataset path"
     )
     parser.add_argument("--mode", default="train", help="train/test/val")
     parser.add_argument("--lrate", default=5e-4, help="training learning rate")
