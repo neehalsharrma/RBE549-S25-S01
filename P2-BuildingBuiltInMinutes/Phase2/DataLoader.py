@@ -44,7 +44,7 @@ class DataLoader:
         focal = 0.5 * W / np.tan(0.5 * camera_angle_x)
 
         # Assuming the same camera is being used for every image, the H,W and focal length will be the same for all images 
-        camera_info= [H, W,focal]
+        camera_info= [W, H,focal]
         return images, poses, camera_info
         
 
