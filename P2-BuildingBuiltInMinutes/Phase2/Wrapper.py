@@ -1,7 +1,7 @@
 """
 Wrapper.py
 
-This script implements a Neural Radiance Field (NeRF) pipeline for rendering 3D scenes from 2D images.
+This script implements NeRF pipeline for rendering 3D scenes from 2D images.
 It includes functions for loading datasets, generating rays, sampling points along rays, rendering images,
 and training/testing the NeRF model.
 
@@ -74,43 +74,53 @@ def loadDataset(data_path, mode):
 
 def PixelToRay(camera_info, pose, pixelPosition, near, far, args):
     """
-    Convert a pixel position to a ray in 3D space.
+    Convert a pixel position in the image to a ray in 3D space.
 
     Parameters
     ----------
     camera_info : tuple
-        Image width, height, and camera matrix (focal length).
+        A tuple containing the image width (W), height (H), and focal length (focal).
     pose : torch.Tensor
-        Camera pose in the world frame.
+        A 4x4 transformation matrix representing the camera's pose in the world frame.
     pixelPosition : tuple
-        Pixel position in the image (x, y).
+        The (x, y) coordinates of the pixel in the image.
     near : float
-        Near clipping plane distance.
+        Near clipping plane distance (not used in this function but included for consistency).
     far : float
-        Far clipping plane distance.
+        Far clipping plane distance (not used in this function but included for consistency).
     args : argparse.Namespace
-        Additional arguments for ray sampling.
+        Additional arguments for ray sampling (not used in this function but included for consistency).
 
     Returns
     -------
     tuple
         ray_origin : torch.Tensor
-            Origin of the ray in 3D space.
+            The origin of the ray in 3D space, which is the camera's position in the world frame.
         ray_direction : torch.Tensor
-            Direction of the ray in 3D space.
+            The normalized direction of the ray in 3D space.
     """
+    # Unpack camera information
     W, H, focal = camera_info
     x, y = pixelPosition
 
+    # Normalize pixel coordinates to camera space
+    # The x and y coordinates are shifted to the camera's center and scaled by the focal length
     norm_x = (x - W * 0.5) / focal
     norm_y = (y - H * 0.5) / focal
+
+    # Create a direction vector in the camera's local coordinate system
+    # The z-axis is assumed to point forward in the camera's view
     direction = torch.tensor([norm_x, -norm_y, 1.0], dtype=torch.float32).to(device)
 
-    rotation = pose[:3, :3]
-    translation = pose[:3, 3]
+    # Extract rotation (R) and translation (T) components from the camera pose
+    rotation = pose[:3, :3]  # 3x3 rotation matrix
+    translation = pose[:3, 3]  # 3D translation vector
 
+    # Transform the direction vector from camera space to world space
     ray_direction = torch.matmul(rotation, direction)
-    ray_direction = ray_direction / torch.norm(ray_direction)
+    ray_direction = ray_direction / torch.norm(ray_direction)  # Normalize the direction vector
+
+    # The ray's origin is the camera's position in the world frame
     ray_origin = translation
 
     return ray_origin, ray_direction
@@ -304,6 +314,7 @@ def loss(groundtruth, prediction):
     torch.Tensor
         MSE loss value.
     """
+    # Calculate the mean squared difference between ground truth and predicted values
     return torch.mean((groundtruth - prediction) ** 2)
 
 
@@ -322,16 +333,20 @@ def train(images, poses, camera_info, args):
     args : argparse.Namespace
         Arguments containing training configurations.
     """
-    # Initialize model, optimizer, and summary writer
+    # Initialize model with positional and directional encoding frequencies
     n_pos_freqs = args.n_pos_freq
     n_dir_freqs = args.n_dirc_freq
 
+    # Create an instance of the NeRF model and move it to the appropriate device
     model = NeRFmodel().to(device)
 
+    # Set up the optimizer with the specified learning rate
     optimizer = torch.optim.Adam(model.parameters(), lr=float(args.lrate))
 
-    # Create log directory if it doesn't exist
+    # Create a directory for logs if it doesn't exist
     os.makedirs(args.logs_path, exist_ok=True)
+
+    # Initialize a TensorBoard SummaryWriter for logging training metrics
     writer = SummaryWriter(log_dir=args.logs_path)
 
     # Load checkpoint if specified
@@ -401,37 +416,49 @@ def render_test_image(model, pose, camera_info, args):
     Parameters
     ----------
     model : NeRFmodel
-        Neural Radiance Field (NeRF) model.
+        Neural Radiance Field (NeRF) model used for rendering.
     pose : ndarray
-        Camera pose in the world frame.
+        Camera pose in the world frame, represented as a 4x4 transformation matrix.
     camera_info : tuple
-        Image width, height, and camera matrix (focal length).
+        A tuple containing the image width (W), height (H), and focal length (focal).
     args : argparse.Namespace
-        Additional arguments for rendering.
+        Additional arguments for rendering, such as the number of samples per ray.
 
     Returns
     -------
     torch.Tensor
-        Rendered test image.
+        Rendered test image as a tensor of shape (H_test, W_test, 3), where H_test and W_test
+        are the downscaled height and width of the image.
     """
+    # Unpack camera information
     W, H, focal = camera_info
-    # Use a smaller resolution for faster rendering during training
+
+    # Downscale the resolution for faster rendering during training
     W_test, H_test = W // 4, H // 4
 
+    # Initialize an empty tensor to store the rendered image
     img = torch.zeros((H_test, W_test, 3)).to(device)
 
+    # Loop through each pixel in the downscaled image
     for j in range(H_test):
         for i in range(W_test):
-            # Map to original resolution
+            # Map the pixel coordinates to the original resolution
             x, y = i * 4, j * 4
+
+            # Generate the ray origin and direction for the current pixel
             ray_o, ray_d = PixelToRay(camera_info, pose, (x, y), 0, 0, args)
 
+            # Convert ray origin and direction to tensors and add a batch dimension
             ray_o = torch.tensor(ray_o, dtype=torch.float32).to(device).unsqueeze(0)
             ray_d = torch.tensor(ray_d, dtype=torch.float32).to(device).unsqueeze(0)
 
+            # Render the RGB value for the current ray
             rgb = render(model, ray_o, ray_d, args)
+
+            # Assign the rendered RGB value to the corresponding pixel in the image
             img[j, i] = rgb[0]
 
+    # Return the rendered test image
     return img
 
 
