@@ -1,4 +1,4 @@
-#!/usr/bin/evn python
+#!/usr/bin/env python
 """
 Wrapper.py
 
@@ -8,17 +8,17 @@ and training/testing the NeRF model.
 
 Modules:
 --------
-- loadDataset(data_path, mode): Load the dataset for training or testing.
-- PixelToRay(camera_info, pose, pixelPosition, near, far, args): Convert a pixel position to a ray in 3D space.
-- PointsAlongRay(ray_origin, ray_direction, near, far, n_samples): Sample points along a ray using stratified sampling.
-- generateBatch(images, poses, camera_info, args): Generate a batch of rays and their corresponding ground truth RGB values.
-- render(model, rays_origin, rays_direction, args): Render RGB values for input rays using the NeRF model.
+- load_dataset(data_path, mode): Load the dataset for training or testing.
+- ray_pixel_convert(camera_info, pose, pixelPosition, near, far, args): Convert a pixel position to a ray in 3D space.
+- ray_sampling(ray_origin, ray_direction, near, far, n_samples): Sample points along a ray using stratified sampling.
+- batch_generate(images, poses, camera_info, args): Generate a batch of rays and their corresponding ground truth RGB values.
+- render(model, ray_origin, ray_direction, args): Render RGB values for input rays using the NeRF model.
 - loss(groundtruth, prediction): Compute the Mean Squared Error (MSE) loss.
-- train(images, poses, camera_info, args): Train the NeRF model.
+- train(images, poses, camera_info, args): Train the NeRF model with mixed precision and save checkpoints.
 - render_test_image(model, pose, camera_info, args): Render a test image for visualization during training.
-- test(images, poses, camera_info, args): Test the NeRF model on the test dataset.
+- test(images, poses, camera_info, args): Test the NeRF model on the test dataset, compute PSNR and SSIM, and save results as a GIF.
 - main(args): Main function to load data and start training or testing.
-- configParser(): Configure the argument parser for the script.
+- parser_config(): Configure the argument parser for the script.
 
 Attributes:
 -----------
@@ -32,23 +32,30 @@ Run the script with appropriate command-line arguments to train or test the NeRF
 """
 
 import argparse
-import glob
-from tqdm import tqdm
-import random
-from torch.utils.tensorboard import SummaryWriter
-import imageio
-import torch
-import matplotlib.pyplot as plt
 import os
+import random
+import sys
 
-from NeRFModel import NeRFmodel
+import cv2
+import imageio
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 from DataLoader import *
+from NeRFModel import NeRFmodel
+from torch.amp import GradScaler
+from torch.utils.tensorboard import SummaryWriter
+from torchmetrics.image import StructuralSimilarityIndexMeasure
+from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 
+# Prevent __pycache__ generation
+sys.dont_write_bytecode = True
 
-def loadDataset(data_path, mode):
+
+def load_dataset(data_path, mode):
     """
     Load the dataset for training or testing.
 
@@ -70,10 +77,10 @@ def loadDataset(data_path, mode):
             Corresponding camera poses in the world frame.
     """
     # images, poses, camera_info (W, H, focal)
-    return DataLoader(data_path).loadDataset(mode)
+    return DataLoader(data_path).load_dataset(mode)
 
 
-def PixelToRay(camera_info, pose, pixelPosition, near, far, args):
+def ray_pixel_convert(camera_info, pose, pixelPosition, near, far, args):
     """
     Convert a pixel position in the image to a ray in 3D space.
 
@@ -102,7 +109,7 @@ def PixelToRay(camera_info, pose, pixelPosition, near, far, args):
     """
     # Ensure pose is a PyTorch tensor
     pose = torch.tensor(pose, dtype=torch.float32, device=device)
-    H, W, focal = camera_info
+    pose_tensor = torch.tensor(pose, dtype=torch.float32, device=device)
 
     # Generate meshgrid for pixel coordinates
     mesh_x, mesh_y = torch.meshgrid(
@@ -120,11 +127,13 @@ def PixelToRay(camera_info, pose, pixelPosition, near, far, args):
 
     # Extract rotation (R) and translation (T) components from the camera pose
     rotation = pose[:3, :3]
-    translation = pose[:3, -1].view(1, 1, 3)
-
+    rotation = pose_tensor[:3, :3]
+    translation = pose_tensor[:3, -1].view(1, 1, 3)
     # Transform the direction vectors from camera space to world space
     ray_direction = torch.sum(directions[..., None, :] * rotation, dim=-1)
-    ray_direction = ray_direction / torch.linalg.norm(ray_direction, dim=-1, keepdim=True)
+    ray_direction = ray_direction / torch.linalg.norm(
+        ray_direction, dim=-1, keepdim=True
+    )
 
     # The ray's origin is the camera's position in the world frame
     ray_origin = translation.expand(ray_direction.shape[0], ray_direction.shape[1], -1)
@@ -146,50 +155,7 @@ def PixelToRay(camera_info, pose, pixelPosition, near, far, args):
     return ray_origin, ray_direction
 
 
-def PointsAlongRay(ray_origin, ray_direction, near, far, n_samples):
-    """
-    Sample points along a ray using stratified sampling.
-
-    Parameters
-    ----------
-    ray_origin : torch.Tensor
-        Origin of the ray in 3D space.
-    ray_direction : torch.Tensor
-        Direction of the ray in 3D space.
-    near : float
-        Near clipping plane distance.
-    far : float
-        Far clipping plane distance.
-    n_samples : int
-        Number of samples along the ray.
-
-    Returns
-    -------
-    tuple
-        points : torch.Tensor
-            Sampled 3D points along the ray.
-        t_samples : torch.Tensor
-            Corresponding t-values for the sampled points.
-    """
-    t_vals = torch.linspace(near, far, n_samples).to(device)
-    rand_t = torch.rand(n_samples - 1).to(device)
-
-    # Scale these random values to be within the bin widths
-    bin_widths = t_vals[1:] - t_vals[:-1]
-
-    # Get starting points of each bin
-    bin_starts = t_vals[:-1]
-
-    # Generate final sample positions: bin_start + rand * bin_width
-    t_samples = bin_starts + rand_t * bin_widths
-
-    # Get the actual 3D points along the ray
-    points = ray_origin[None, :] + ray_direction[None, :] * t_samples[:, None]
-
-    return points, t_samples
-
-
-def generateBatch(images, poses, camera_info, args):
+def batch_generate(images, poses, camera_info, args):
     """
     Generate a batch of rays and their corresponding ground truth RGB values.
 
@@ -234,20 +200,22 @@ def generateBatch(images, poses, camera_info, args):
     # Generate rays for each sampled pixel
     for i in range(n_rays):
         # Get ray origin and direction for this pixel
-        ray_o, ray_d = PixelToRay(
+        ray_o, ray_d = ray_pixel_convert(
             camera_info, pose, (x_coords[i].item(), y_coords[i].item()), 0, 0, args
         )
         rays_o[i] = ray_o
         rays_d[i] = ray_d
 
         # Get ground truth RGB value for this pixel
-        rgb_gt[i] = torch.tensor(image[y_coords[i], x_coords[i]], dtype=torch.float32, device=device)
+        rgb_gt[i] = torch.tensor(
+            image[y_coords[i], x_coords[i]], dtype=torch.float32, device=device
+        )
 
     return rays_o, rays_d, rgb_gt
 
 
 # Run neural network on various points along the ray and find the color of the ray
-def render(model, rays_origin, rays_direction, args):
+def render(model, ray_origin, ray_direction, args):
     """
     Render RGB values for input rays using the NeRF model.
 
@@ -255,9 +223,9 @@ def render(model, rays_origin, rays_direction, args):
     ----------
     model : NeRFmodel
         Neural Radiance Field (NeRF) model.
-    rays_origin : torch.Tensor
+    ray_origin : torch.Tensor
         Origins of the input rays.
-    rays_direction : torch.Tensor
+    ray_direction : torch.Tensor
         Directions of the input rays.
     args : argparse.Namespace
         Additional arguments for rendering.
@@ -267,48 +235,45 @@ def render(model, rays_origin, rays_direction, args):
     torch.Tensor
         RGB values of the input rays.
     """
-    n_rays = rays_origin.shape[0]
+    n_rays = ray_origin.shape[0]
     n_samples = args.n_sample
     near, far = 2.0, 6.0  # Typical values for synthetic NeRF datasets
 
-    # Storage for final RGB for each ray
-    rgb_final = torch.zeros((n_rays, 3)).to(device)
+    # Stratified sampling along the ray
+    t_vals = torch.linspace(near, far, n_samples).to(device)
+    t_vals = t_vals.expand(n_rays, n_samples)
+    random_offsets = torch.rand(n_rays, n_samples).to(device) * (far - near) / n_samples
+    t_vals += random_offsets
 
-    # Process each ray
-    for i in range(n_rays):
-        # Sample points along the ray using stratified sampling
-        points, t_vals = PointsAlongRay(
-            rays_origin[i], rays_direction[i], near, far, n_samples
-        )
+    # Compute 3D query points along the rays
+    query_points = ray_origin.unsqueeze(1) + ray_direction.unsqueeze(
+        1
+    ) * t_vals.unsqueeze(-1)
+    query_points_flat = query_points.view(-1, 3)
 
-        # Calculate distances between adjacent samples
-        deltas = t_vals[1:] - t_vals[:-1]
-        # Add a small value for the last delta
-        deltas = torch.cat([deltas, torch.tensor([1e-10]).to(device)])
+    # Expand ray directions for all samples
+    view_dirs = ray_direction.unsqueeze(1).expand(-1, n_samples, -1).reshape(-1, 3)
 
-        # Normalize directions for the NeRF model
-        view_dirs = rays_direction[i].expand(points.shape[0], 3)
+    # Predict RGB and density for each point along the ray
+    rgb, sigma = model(query_points_flat, view_dirs)
+    rgb = rgb.view(n_rays, n_samples, 3)
+    sigma = sigma.view(n_rays, n_samples)
 
-        # Predict RGB and density for each point along the ray
-        rgb, sigma = model(points, view_dirs)
+    # Volume rendering
+    deltas = t_vals[:, 1:] - t_vals[:, :-1]
+    deltas = torch.cat(
+        [deltas, torch.tensor([1e10]).expand(n_rays, 1).to(device)], dim=-1
+    )
 
-        # Calculate alpha values (opacity)
-        alpha = 1.0 - torch.exp(-sigma.squeeze() * deltas)
+    alpha = 1.0 - torch.exp(-sigma * deltas)
+    transmittance = torch.cumprod(
+        torch.cat([torch.ones((n_rays, 1)).to(device), 1.0 - alpha + 1e-10], dim=-1),
+        dim=-1,
+    )[:, :-1]
+    weights = alpha * transmittance
 
-        # Calculate transmittance (T_i in the paper)
-        # T_i = exp(-sum_{j=1}^{i-1} sigma_j * delta_j)
-        exp_term = torch.exp(-sigma.squeeze() * deltas)
-        transmittance = torch.cumprod(
-            torch.cat([torch.ones(1).to(device), exp_term[:-1]]), dim=0
-        )
-
-        # Calculate weights as in the paper: T_i * (1 - exp(-sigma_i * delta_i))
-        weights = transmittance * alpha
-
-        # Final rendered RGB for this ray
-        rgb_ray = torch.sum(weights.unsqueeze(-1) * rgb, dim=0)
-
-        rgb_final[i] = rgb_ray
+    # Compute final RGB values
+    rgb_final = torch.sum(weights.unsqueeze(-1) * rgb, dim=1)
 
     return rgb_final
 
@@ -348,10 +313,6 @@ def train(images, poses, camera_info, args):
     args : argparse.Namespace
         Arguments containing training configurations.
     """
-    # Initialize model with positional and directional encoding frequencies
-    n_pos_freqs = args.n_pos_freq
-    n_dir_freqs = args.n_dirc_freq
-
     # Create an instance of the NeRF model and move it to the appropriate device
     model = NeRFmodel().to(device)
 
@@ -378,22 +339,26 @@ def train(images, poses, camera_info, args):
     # Create checkpoint directory if it doesn't exist
     os.makedirs(args.checkpoint_path, exist_ok=True)
 
+    scaler = torch.amp.GradScaler("cuda")  # Initialize GradScaler for mixed precision
+
     # Training loop
     pbar = tqdm(range(start_iter, int(args.max_iters)))
     for i in pbar:
         # Generate batch of rays
-        rays_o, rays_d, rgb_gt = generateBatch(images, poses, camera_info, args)
+        rays_o, rays_d, rgb_gt = batch_generate(images, poses, camera_info, args)
 
-        # Forward pass
-        rgb_pred = render(model, rays_o, rays_d, args)
+        with torch.amp.autocast("cuda"):  # Enable autocast for mixed precision
+            # Forward pass
+            rgb_pred = render(model, rays_o, rays_d, args)
 
-        # Calculate loss
-        loss_val = loss(rgb_gt, rgb_pred)
+            # Calculate loss
+            loss_val = loss(rgb_gt, rgb_pred)
 
         # Backward pass and optimization
         optimizer.zero_grad()
-        loss_val.backward()
-        optimizer.step()
+        scaler.scale(loss_val).backward()  # Scale the loss for mixed precision
+        scaler.step(optimizer)  # Step the optimizer
+        scaler.update()  # Update the scaler
 
         # Log progress
         pbar.set_description(f"Loss: {loss_val.item():.4f}")
@@ -446,7 +411,7 @@ def render_test_image(model, pose, camera_info, args):
         are the downscaled height and width of the image.
     """
     # Unpack camera information
-    W, H, focal = camera_info
+    W, H, _ = camera_info
 
     # Downscale the resolution for faster rendering during training
     W_test, H_test = W // 4, H // 4
@@ -461,7 +426,7 @@ def render_test_image(model, pose, camera_info, args):
             x, y = i * 4, j * 4
 
             # Generate the ray origin and direction for the current pixel
-            ray_o, ray_d = PixelToRay(camera_info, pose, (x, y), 0, 0, args)
+            ray_o, ray_d = ray_pixel_convert(camera_info, pose, (x, y), 0, 0, args)
 
             # Convert ray origin and direction to tensors and add a batch dimension
             ray_o = torch.tensor(ray_o, dtype=torch.float32).to(device).unsqueeze(0)
@@ -479,121 +444,170 @@ def render_test_image(model, pose, camera_info, args):
 
 def test(images, poses, camera_info, args):
     """
-    Test the NeRF model on the test dataset.
+    Test the NeRF model and generate predictions.
 
     Parameters
     ----------
-    images : list
-        All images in the test dataset.
-    poses : list
-        Corresponding camera poses in the world frame.
+    images : torch.Tensor
+        Test images.
+    poses : torch.Tensor
+        Corresponding camera poses.
     camera_info : tuple
-        Image width, height, and camera matrix (focal length).
+        Image width, height, and focal length.
     args : argparse.Namespace
-        Arguments containing testing configurations.
+        Testing configurations.
+
+    Returns
+    -------
+    None
     """
-    # Initialize model
-    n_pos_freqs = args.n_pos_freq
-    n_dir_freqs = args.n_dirc_freq
-
-    model = NeRFmodel().to(device)
-
-    # Load checkpoint
-    checkpoint_path = os.path.join(args.checkpoint_path, "model.pth")
-    if os.path.exists(checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        print(f"Loaded checkpoint from iteration {checkpoint['iteration']}")
-    else:
-        print("No checkpoint found. Cannot test without a trained model.")
-        return
-
-    # Create images directory if it doesn't exist
-    os.makedirs(args.images_path, exist_ok=True)
-
-    # Set the model to evaluation mode
-    model.eval()
-    with torch.no_grad():
-        psnrs = []  # List to store PSNR values for each test image
-
-        # Loop through each test image and its corresponding pose
-        for idx, (image, pose) in enumerate(zip(images, poses)):
-            print(f"Rendering test image {idx+1}/{len(images)}")
-
-            # Get image dimensions and focal length from camera info
-            W, H, focal = camera_info
-
-            # Initialize an empty tensor to store the rendered image
-            img = torch.zeros((H, W, 3)).to(device)
-
-            # Process the image in chunks to avoid memory issues
-            chunk_size = 64  # Number of rows to process at a time
-            for j in tqdm(range(0, H, chunk_size)):
-                j_end = min(j + chunk_size, H)  # End row for the current chunk
-                for i in range(0, W, chunk_size):
-                    i_end = min(i + chunk_size, W)  # End column for the current chunk
-
-                    rays_o = []  # List to store ray origins for the current chunk
-                    rays_d = []  # List to store ray directions for the current chunk
-
-                    # Generate rays for each pixel in the current chunk
-                    for y in range(j, j_end):
-                        for x in range(i, i_end):
-                            ray_o, ray_d = PixelToRay(
-                                camera_info, pose, (x, y), 0, 0, args
-                            )
-                            rays_o.append(ray_o)
-                            rays_d.append(ray_d)
-
-                    # Convert ray origins and directions to tensors
-                    rays_o = torch.tensor(np.stack(rays_o), dtype=torch.float32).to(
-                        device
-                    )
-                    rays_d = torch.tensor(np.stack(rays_d), dtype=torch.float32).to(
-                        device
-                    )
-
-                    # Render the RGB values for the current chunk of rays
-                    rgb_chunk = render(model, rays_o, rays_d, args)
-
-                    # Place the rendered RGB values into the corresponding positions in the image
-                    pixel_idx = 0
-                    for y in range(j, j_end):
-                        for x in range(i, i_end):
-                            img[y, x] = rgb_chunk[pixel_idx]
-                            pixel_idx += 1
-
-            # Convert the rendered image to a numpy array for saving
-            img_np = img.cpu().numpy()
-            img_np = np.clip(
-                img_np, 0, 1
-            )  # Ensure pixel values are in the range [0, 1]
-
-            # Save the rendered image as a PNG file
-            plt.figure()
-            plt.imshow(img_np)
-            plt.savefig(os.path.join(args.images_path, f"test_{idx:03d}.png"))
-            plt.close()
-
-            # Save the rendered image using imageio for compatibility
-            imageio.imwrite(
-                os.path.join(args.images_path, f"test_{idx:03d}.png"),
-                (img_np * 255).astype(np.uint8),
+    if args.load_checkpoint:
+        # Load the NeRF model and its pre-trained weights from the specified checkpoint
+        model = NeRFmodel().to(device)
+        model.load_state_dict(
+            torch.load(
+                os.path.join(args.checkpoint_path, "model.pt"), map_location=device
             )
+        )
 
-            # Calculate PSNR (Peak Signal-to-Noise Ratio) if ground truth is available
-            if image is not None:
-                gt = torch.tensor(image, dtype=torch.float32).to(
-                    device
-                )  # Ground truth image
-                mse = torch.mean((gt - img) ** 2)  # Mean Squared Error
-                psnr = -10 * torch.log10(mse)  # PSNR calculation
-                psnrs.append(psnr.item())  # Append PSNR value to the list
-                print(f"PSNR: {psnr.item():.2f} dB")
+    # Extract camera parameters: height, width, and focal length
+    H, W, _ = camera_info
+    model.eval()  # Set the model to evaluation mode
 
-        # Report the average PSNR across all test images
-        if psnrs:
-            print(f"Average PSNR: {np.mean(psnrs):.2f} dB")
+    # Initialize lists to store PSNR and SSIM values for evaluation
+    PSNRs = []
+    SSIMs = []
+
+    # Define functions to calculate PSNR and SSIM
+    def PSNR(ground_truth, prediction):
+        """
+        Compute the Peak Signal-to-Noise Ratio (PSNR).
+
+        Parameters
+        ----------
+        ground_truth : numpy.ndarray
+            Ground truth image.
+        prediction : numpy.ndarray
+            Predicted image.
+
+        Returns
+        -------
+        float
+            PSNR value.
+        """
+        ground_truth = torch.tensor(ground_truth)
+        prediction = torch.tensor(prediction)
+        mse = torch.mean((ground_truth - prediction) ** 2)
+        return 10 * torch.log10(1.0 / mse)
+
+    def SSIM(ground_truth, prediction):
+        """
+        Compute the Structural Similarity Index Measure (SSIM).
+
+        Parameters
+        ----------
+        ground_truth : numpy.ndarray
+            Ground truth image.
+        prediction : numpy.ndarray
+            Predicted image.
+
+        Returns
+        -------
+        float
+            SSIM value.
+        """
+        # Convert ground truth and predicted images to tensors and adjust dimensions
+        # Permute the dimensions to match the format (C, H, W) and add a batch dimension
+        ground_truth = torch.tensor(ground_truth).permute(2, 0, 1).unsqueeze(0)
+        prediction = torch.tensor(prediction).permute(2, 0, 1).unsqueeze(0)
+
+        # Initialize the Structural Similarity Index Measure (SSIM) metric
+        # The data_range parameter specifies the range of pixel values (0 to 1 in this case)
+        ssim = StructuralSimilarityIndexMeasure(data_range=1.0)
+
+        # Compute and return the SSIM value between the predicted and ground truth images
+        return ssim(prediction, ground_truth)
+
+    with torch.no_grad():  # Disable gradient computation for testing
+        # Generate rays and ground truth colors for the test dataset
+        test_ray_origins, test_ray_directions, test_ground_truth = batch_generate(
+            images, poses, camera_info, args
+        )
+        # Calculate the number of test images and rays per image
+        num_images = test_ground_truth.shape[0] // (H * W)
+        num_rays_per_image = H * W
+        frames = []  # List to store frames for GIF creation
+
+        for index in range(num_images):
+            print(f"Testing on image: {index}")
+
+            if index == 60:  # Render and evaluate only the 60th image
+                # Render the predicted image using the NeRF model
+                predicted_image = (
+                    render(
+                        model,
+                        test_ray_origins[
+                            num_rays_per_image
+                            * index : num_rays_per_image
+                            * (index + 1)
+                        ],
+                        test_ray_directions[
+                            num_rays_per_image
+                            * index : num_rays_per_image
+                            * (index + 1)
+                        ],
+                        args,
+                    )
+                    .view(H, W, 3)
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
+                # Extract the ground truth image for comparison
+                groundtruth_image = (
+                    test_ground_truth[
+                        index * num_rays_per_image : (index + 1) * num_rays_per_image
+                    ]
+                    .view(H, W, 3)
+                    .cpu()
+                    .detach()
+                    .numpy()
+                )
+
+                # Append the predicted image to the frames list for GIF creation
+                frames.append((255 * predicted_image).astype(np.uint8))
+
+                # Calculate PSNR (Peak Signal-to-Noise Ratio) for the rendered image
+                psnr = PSNR(groundtruth_image, predicted_image)
+                PSNRs.append(psnr)
+
+                # Calculate SSIM (Structural Similarity Index Measure) for the rendered image
+                ssim = SSIM(groundtruth_image, predicted_image)
+                SSIMs.append(ssim)
+
+                if args.plot:  # If plotting is enabled, visualize the results
+                    # Plot the ground truth and predicted images side by side
+                    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+
+                    ax[0].imshow(groundtruth_image)
+                    ax[0].set_title("Original Test Image")
+                    ax[0].axis("off")  # Hide axes ticks
+
+                    ax[1].imshow(predicted_image)
+                    ax[1].set_title("Predicted Test Image")
+                    ax[1].axis("off")  # Hide axes ticks
+
+                    plt.show()
+
+    # Compute and print the average PSNR and SSIM values across all test images
+    print(f"Average PSNR: {torch.mean(torch.tensor(PSNRs))}")
+    print(f"Average SSIM: {torch.mean(torch.tensor(SSIMs))}")
+
+    # Save the rendered frames as an animated GIF
+    gif_filename = "output.gif"
+    imageio.mimsave(gif_filename, frames, fps=30)
+
+    print(f"GIF saved as {gif_filename}")
 
 
 def main(args):
@@ -607,7 +621,7 @@ def main(args):
     """
     # load data
     print("Loading data...")
-    images, poses, camera_info = loadDataset(args.data_path, args.mode)
+    images, poses, camera_info = load_dataset(args.data_path, args.mode)
 
     if args.mode == "train":
         print("Start training")
@@ -618,7 +632,7 @@ def main(args):
         test(images, poses, camera_info, args)
 
 
-def configParser():
+def parser_config():
     """
     Configure the argument parser for the script.
 
@@ -629,7 +643,9 @@ def configParser():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data_path", default="lego", help="dataset path"
+        "--data_path",
+        default="lego",
+        help="Path to the dataset. 'lego' is a sample dataset used for demonstration purposes.",
     )
     parser.add_argument("--mode", default="train", help="train/test/val")
     parser.add_argument("--lrate", default=5e-4, help="training learning rate")
@@ -670,6 +686,6 @@ def configParser():
 
 if __name__ == "__main__":
     # Parse command-line arguments and start the main function
-    parser = configParser()
+    parser = parser_config()
     args = parser.parse_args()
     main(args)

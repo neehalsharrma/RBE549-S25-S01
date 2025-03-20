@@ -1,4 +1,4 @@
-#!/usr/bin/evn python
+#!/usr/bin/evn python3
 """
 DataLoader Module
 
@@ -12,10 +12,14 @@ DataLoader
     A class to load and process datasets for NeRF.
 """
 
-import os
 import json
-import numpy as np
+import os
+import sys
+
 import cv2
+import numpy as np
+
+sys.dont_write_bytecode = True  # Prevent __pycache__ generation
 
 
 class DataLoader:
@@ -33,18 +37,18 @@ class DataLoader:
         Loads the dataset for the specified mode (train or test).
     """
 
-    def __init__(self, data_path="nerf_synthetic/lego"):
+    def __init__(self, data_path="lego"):
         """
         Initializes the DataLoader with the dataset path.
 
         Parameters
         ----------
         data_path : str, optional
-            Path to the dataset directory (default is "nerf_synthetic/lego").
+            Path to the dataset directory (default is "lego").
         """
         self.data_path = data_path
 
-    def loadDataset(self, mode):
+    def load_dataset(self, mode):
         """
         Loads the dataset for the specified mode (train or test).
 

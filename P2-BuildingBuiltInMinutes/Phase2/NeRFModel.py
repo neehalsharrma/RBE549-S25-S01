@@ -12,10 +12,15 @@ NeRFmodel
     Implements the NeRF model with positional encoding and a multi-layer perceptron (MLP).
 """
 
+import sys
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
+
+# Prevent __pycache__ generation
+sys.dont_write_bytecode = True
 
 
 class NeRFmodel(nn.Module):
@@ -55,6 +60,12 @@ class NeRFmodel(nn.Module):
             Number of levels for positional encoding of viewing directions, by default 4.
         hidden_layer_size : int, optional
             Number of neurons in each hidden layer, by default 256.
+
+        Notes
+        -----
+        - A skip connection is added at layer 4 of the spatial coordinate MLP.
+        - The last layer of the spatial coordinate MLP outputs both density (sigma) 
+          and features, where the output dimension is `hidden_layer_size + 1`.
         """
         super(NeRFmodel, self).__init__()
 
@@ -108,8 +119,7 @@ class NeRFmodel(nn.Module):
             encoded.append(torch.sin(2**i * np.pi * inputs))
             encoded.append(torch.cos(2**i * np.pi * inputs))
         # Concatenate all encoded components along the last dimension
-        encoded_tensor = torch.cat(encoded, dim=-1)
-        return encoded_tensor
+        return torch.cat(encoded, dim=-1)
 
     def forward(self, positions, directions):
         """
@@ -131,25 +141,24 @@ class NeRFmodel(nn.Module):
         """
         # Positional encoding for spatial coordinates
         encoded_positions = self.position_encoding(positions, self.embed_pos_levels)
-        x = encoded_positions
 
         # Pass through the spatial coordinate MLP
         for i, layer in enumerate(self.layers):
             # Add skip connection at layer 4
             if i == 4:
-                x = torch.cat([x, encoded_positions], -1)
-            x = F.relu(layer(x))
+                encoded_positions = torch.cat([encoded_positions, self.position_encoding(positions, self.embed_pos_levels)], -1)
+            encoded_positions = F.relu(layer(encoded_positions))
 
         # Separate density (sigma) and features
-        sigma, x = x[..., -1], x[..., :-1]
+        sigma, features = encoded_positions[..., -1], encoded_positions[..., :-1]
 
         # Positional encoding for viewing directions
         encoded_directions = self.position_encoding(directions, self.embed_dir_levels)
         # Combine spatial features and directional features
-        x = torch.cat([x, encoded_directions], -1)
-        x = F.relu(self.feature_layer(x))
+        features = torch.cat([features, encoded_directions], -1)
+        features = F.relu(self.feature_layer(features))
         # Predict RGB color values
-        x = self.rgb_layer(x)
+        rgb = self.rgb_layer(features)
 
         # Apply sigmoid activation to RGB values and return
-        return torch.sigmoid(x), sigma
+        return torch.sigmoid(rgb), sigma
