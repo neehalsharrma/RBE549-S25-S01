@@ -1,4 +1,5 @@
 # Ignoring data file
+P2-BuildingBuiltInMinutes/Phase1/Data/
 P2-BuildingBuiltInMinutes/Phase2/nerf_synthetic/
 P2-BuildingBuiltInMinutes/Phase2/lego/
 P2-BuildingBuiltInMinutes/Phase2/logs/

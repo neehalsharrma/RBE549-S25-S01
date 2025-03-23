@@ -603,8 +603,9 @@ def test(images, poses, camera_info, args):
     print(f"Average PSNR: {torch.mean(torch.tensor(PSNRs))}")
     print(f"Average SSIM: {torch.mean(torch.tensor(SSIMs))}")
 
-    # Save the rendered frames as an animated GIF
-    gif_filename = "output.gif"
+    # Save the rendered frames as an animated GIF in the same folder as images
+    os.makedirs(args.images_path, exist_ok=True)
+    gif_filename = os.path.join(args.images_path, "output.gif")
     imageio.mimsave(gif_filename, frames, fps=30)
 
     print(f"GIF saved as {gif_filename}")
