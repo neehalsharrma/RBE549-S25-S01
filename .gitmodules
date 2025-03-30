@@ -3,3 +3,9 @@
 	url = https://github.com/neehalsharrma/RBE549-S25-S01.wiki.git
 	branch = master
 	update = rebase
+[submodule "P3-EinsteinVision/Networks/TwinLiteNetPlus"]
+	path = P3-EinsteinVision/Networks/TwinLiteNetPlus
+	url = git@github.com:chequanghuy/TwinLiteNetPlus.git
+[submodule "P3-EinsteinVision/Networks/ZoeDepth"]
+	path = P3-EinsteinVision/Networks/ZoeDepth
+	url = https://github.com/isl-org/ZoeDepth.git
