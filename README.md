@@ -2,15 +2,17 @@
 
 Personal lecture notes, codebase, and file repository for RBE 549, Computer Vision, in Spring 2025, as taught by Prof. Nitin Sanket. [View the course page here!](https://pear.wpi.edu/teaching/rbe549/spring2025.html)
 
+Thanks to [Nikesh Walling](https://github.com/valleyquail) and [Nehal Sonawane](https://github.com/rank-infinity) for contributing to this repository!
+
 ## How to Use This Repository
 
 Every assignment is housed in its own folder with a report for the assigment. Follow the instructions in the README inside each folder to run the code. A general [requirements.txt](requirements.txt) file contains the `venv` variables needed to run the scripts in the assignment folders.
 
-The [repository wiki](https://github.com/neehalsharrma/RBE549-S25-S01/wiki) covers the theoretical concepts taught in the course as well as more detailed content about each assignment. The best way to view it is online on GitHub; it has also been added as a submodule for local ease of access if you wish to clone this repository -- use `git clone --recursive` so you also clone the submodule.
+The [repository wiki](https://github.com/neehalsharrma/RBE549-S25-S01/wiki) covers the theoretical concepts taught in the course. The best way to view it is online on GitHub; it has also been added as a submodule for local ease of access if you wish to clone this repository -- use `git clone --recursive` so you also clone the submodule.
 
 ## Citation
 
-If you find this repository useful, please cite it in in BibLaTex like so:
+If you find this repository useful, please cite it in BibLaTex:
 
 ```bibtex
 @software {neehalrbe549,
@@ -21,5 +23,21 @@ If you find this repository useful, please cite it in in BibLaTex like so:
     license = {GNU AGPLv3},
     url = {https://github.com/neehalsharrma/RBE549-S25-S01/wiki},
     abstract = {Codebase and reference notes for the course RBE549 -- Computer Vision},
-    repository= {https://github.com/neehalsharrma/RBE549-S25-S01/}}
+    repository= {https://github.com/neehalsharrma/RBE549-S25-S01/}
+}
+```
+
+If you use BibTex:
+
+```bibtex
+@misc{neehalrbe549,
+    title        = {RBE549 Computer Vision Lecture Notes and Assignments},
+    author       = {Neehal Sharrma and Nehal Sonawane and Nikesh Walling},
+    year         = {2025},
+    institution  = {Worcester Polytechnic Institute},
+    note         = {GNU AGPLv3 license},
+    url          = {https://github.com/neehalsharrma/RBE549-S25-S01/wiki},
+    abstract     = {Codebase and reference notes for the course RBE549 -- Computer Vision},
+    howpublished = {\url{https://github.com/neehalsharrma/RBE549-S25-S01/}}
+}
 ```
