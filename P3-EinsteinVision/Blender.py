@@ -1,3 +1,20 @@
+"""
+This script automates the process of spawning 3D objects in a Blender scene based on data
+provided in a JSON file. It supports various types of vehicles and traffic-related items,
+loading their models from specified .blend files. The script also handles object placement,
+rotation, scaling, and rendering of the scene.
+
+Key Features:
+- Load 3D models from .blend files for different object types.
+- Spawn objects at specified locations with given rotations and scales.
+- Render the scene and save the output images for each frame.
+- Clean the scene by removing all objects except the camera before spawning new objects.
+
+Dependencies:
+- Blender's Python API (bpy)
+- JSON file containing object spawn data
+"""
+
 import bpy
 import json
 import os
