@@ -3,7 +3,7 @@
     "frame": 1,
     "objects": [
       {
-        "type": "car",
+        "type": "Car",
         "position": {
           "x": 12.3,
           "y": 85.6,
@@ -21,7 +21,7 @@
         }
       },
       {
-        "type": "car",
+        "type": "Car",
         "position": {
           "x": 50.6,
           "y": 100,
@@ -39,7 +39,7 @@
         }
       },
       {
-        "type": "car",
+        "type": "Car",
         "position": {
           "x": -37.8,
           "y": 120,
