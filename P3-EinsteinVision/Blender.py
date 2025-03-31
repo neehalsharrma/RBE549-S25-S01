@@ -100,12 +100,6 @@ def spawn_objects(
     return spawned_objects
 
 
-# Delete all objects in the scene except for the camera
-# This ensures a clean scene before adding new objects
-for obj in bpy.context.scene.objects:
-    if obj.type != "CAMERA":
-        bpy.data.objects.remove(obj, do_unlink=True)
-
 # Path to the JSON file containing object spawn data
 file_path = "./spawn.json"
 
@@ -120,21 +114,28 @@ positions: List[dict] = []  # Object positions
 rotations: List[dict] = []  # Object rotations
 scales: List[dict] = []  # Object scales
 
-# Spawn a car object at the origin with a specific rotation
-spawn_objects(vehicle_filepaths["Car"], (0, 0, 0), (0, 0, 3.14))
-
-# Set the camera's location and rotation
-camera_location = (0.0, 0.2, 1.4)  # Camera position
-camera_rotation = (1.57, 0.0, 0.0)  # Camera rotation in radians
-
-# Check if a camera exists in the scene and set its properties
-if "Camera" in bpy.data.objects:
-    camera = bpy.data.objects["Camera"]
-    camera.location = camera_location
-    camera.rotation_euler = camera_rotation
-
 # Iterate through the JSON data to extract object details
 for frame_data in data:
+    # Delete all objects in the scene except for the camera
+    # This ensures a clean scene before adding new objects
+    for obj in bpy.context.scene.objects:
+        if obj.type != "CAMERA":
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+    # Spawn a car object at the origin with a specific rotation
+    spawn_objects(vehicle_filepaths["Car"], (0, 0, 0), (0, 0, 3.14))
+
+    # Set the camera's location and rotation
+    camera_location = (0.0, 0.2, 1.4)  # Camera position
+    camera_rotation = (1.57, 0.0, 0.0)  # Camera rotation in radians
+
+    # Check if a camera exists in the scene and set its properties
+    if "Camera" in bpy.data.objects:
+        camera = bpy.data.objects["Camera"]
+        camera.location = camera_location
+        camera.rotation_euler = camera_rotation
+
+    # Extract object details for the current frame
     for obj in frame_data["objects"]:
         types.append(obj["type"])  # Store object type
         positions.append(obj["position"])  # Store object position

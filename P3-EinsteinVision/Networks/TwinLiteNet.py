@@ -10,9 +10,6 @@ load_TwinLiteNet(weights: str)
     Loads the TwinLiteNetPlus model with the specified pre-trained weights.
 """
 
-import cv2
-import numpy as np
-import os
 import torch
 from TwinLiteNetPlus.model.model import TwinLiteNetPlus
 
