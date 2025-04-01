@@ -20,10 +20,10 @@ sys.dont_write_bytecode = True
 
 
 def load_video(
-    video_path: str = "./Data/Sequences",
-    video_num: int = 1,
-    cam_type: str = "front",
-    distorted: bool = False,
+        video_path: str = "../Data/Sequences",
+        video_num: int = 1,
+        cam_type: str = "front",
+        distorted: bool = False,
 ) -> tuple[cv2.VideoCapture, int]:
     """
     Load a video file and return a video capture object and the number of frames.

@@ -33,15 +33,19 @@ import sys
 import cv2
 import torch
 from Networks.DataLoader import get_frame, load_video
-from Networks.MiDaS import load_ZoeDepth
-from Networks.TwinLiteNet import load_TwinLiteNet
+from Networks.MiDaS import load_ZoeDepth, colorize
+from Networks.TwinLiteNet import load_TwinLiteNet, show_seg_result
 from Networks.YOLOv11 import load_model as load_yolo
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
 
+yolo = False
+MiDaS = True
+twin_lite = False
 
-def process_video(video_path: str, output_json: str) -> None:
+
+def process_video(video_path: str, output_json: str, device: torch.device = torch.device('cpu')) -> None:
     """
     Process a video and generate a JSON file with object data.
 
@@ -61,15 +65,20 @@ def process_video(video_path: str, output_json: str) -> None:
     None
     """
     # Load the video and get the total number of frames
-    cap, num_frames = load_video(video_path=video_path)
+    cap, num_frames = load_video(video_path=video_path, video_num=2)
     print(f"Loaded video with {num_frames} frames.")
 
     # Load the models
-    yolo_model = load_yolo()
-    depth_model = load_ZoeDepth()
-    twinlite_model = load_TwinLiteNet(
-        weights="Networks/Pretrained/tlp_medium.pth", config="medium"
-    )
+    if yolo:
+        yolo_model = load_yolo()
+    if MiDaS:
+        depth_model = load_ZoeDepth()
+    if twin_lite:
+        twinlite_model = load_TwinLiteNet(
+            weights="Networks/Pretrained/tlp_medium.pth",
+            config="medium",
+            dev=device
+        )
 
     # Initialize the JSON data structure
     spawn_data = []
@@ -89,68 +98,94 @@ def process_video(video_path: str, output_json: str) -> None:
         if frame is None:
             continue
 
-        # YOLOv11 object detection
-        detections = yolo_model.predict(frame, verbose=False)
-        objects = []
-        for det in detections[0].boxes:
-            obj_type = det.cls  # Object class
-            bbox = det.xyxy.cpu().numpy()  # Bounding box coordinates
-            objects.append(
-                {
-                    "type": yolo_model.names[int(obj_type)],
-                    "position": {"x": bbox[0][0], "y": bbox[0][1], "z": 0},
-                    "rotation": {"x": 0, "y": 0, "z": 0},
-                    "scale": {"x": 1, "y": 1, "z": 1},
-                }
+        if yolo:
+            yolo_frame = frame.copy()
+            # YOLOv11 object detection
+            detections = yolo_model.predict(frame, verbose=False)
+            objects = []
+            for det in detections[0].boxes:
+                obj_type = det.cls  # Object class
+                bbox = det.xyxy.cpu().numpy()  # Bounding box coordinates
+                objects.append(
+                    {
+                        "type": yolo_model.names[int(obj_type)],
+                        "position": {"x": bbox[0][0], "y": bbox[0][1], "z": 0},
+                        "rotation": {"x": 0, "y": 0, "z": 0},
+                        "scale": {"x": 1, "y": 1, "z": 1},
+                    }
+                )
+                # Draw bounding boxes on the frame
+                cv2.rectangle(
+                    yolo_frame,
+                    (int(bbox[0][0]), int(bbox[0][1])),
+                    (int(bbox[0][2]), int(bbox[0][3])),
+                    (0, 255, 0),
+                    2,
+                )
+                cv2.putText(
+                    yolo_frame,
+                    yolo_model.names[int(obj_type)],
+                    (int(bbox[0][0]), int(bbox[0][1]) - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 255, 0),
+                    2,
+                )
+
+            # Save YOLO-annotated frame
+            cv2.imwrite(os.path.join(yolo_dir, f"annotated_frame_{frame_idx}.png"), yolo_frame)
+
+        if MiDaS:
+            midas_frame = frame.copy()
+            midas_frame = cv2.resize(midas_frame, (512, 384))
+            batched_frame = torch.tensor(midas_frame.transpose(2, 0, 1), dtype=torch.float32).unsqueeze(0)
+
+            def get_depth_from_prediction(pred):
+                if isinstance(pred, torch.Tensor):
+                    pred = pred  # pass
+                elif isinstance(pred, (list, tuple)):
+                    pred = pred[-1]
+                elif isinstance(pred, dict):
+                    pred = pred['metric_depth'] if 'metric_depth' in pred else pred['out']
+                else:
+                    raise NotImplementedError(f"Unknown output type {type(pred)}")
+                return pred
+
+            # MiDaS depth estimation
+            depth_map = depth_model.infer(batched_frame)
+            depth_map = get_depth_from_prediction(depth_map)
+            # Save depth map as an image
+            # depth_map_normalized = cv2.normalize(
+            #     depth_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
+            # )
+            depth_map_colorized = colorize(depth_map.detach().cpu().squeeze().numpy())
+            cv2.imwrite(
+                os.path.join(depth_dir, f"depth_frame_{frame_idx}.png"),
+                depth_map_colorized,
             )
-            # Draw bounding boxes on the frame
-            cv2.rectangle(
-                frame,
-                (int(bbox[0][0]), int(bbox[0][1])),
-                (int(bbox[0][2]), int(bbox[0][3])),
-                (0, 255, 0),
-                2,
+
+        if twin_lite:
+            # TwinLiteNet processing (e.g., semantic segmentation or other tasks)
+            twinlite_output = twinlite_model(
+                torch.tensor(frame.transpose(2, 0, 1)).unsqueeze(0).to(device).float() / 255
             )
-            cv2.putText(
-                frame,
-                yolo_model.names[int(obj_type)],
-                (int(bbox[0][0]), int(bbox[0][1]) - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (0, 255, 0),
-                2,
+            da_seg_out, ll_seg_out = twinlite_output
+
+            _, da_seg_mask = torch.max(da_seg_out, 1)
+            da_seg_mask = da_seg_mask.int().squeeze().cpu().numpy()
+            # da_seg_mask = morphological_process(da_seg_mask, kernel_size=7)
+
+            _, ll_seg_mask = torch.max(ll_seg_out, 1)
+            ll_seg_mask = ll_seg_mask.int().squeeze().cpu().numpy()
+            # Lane line post-processing
+
+            img_vis = show_seg_result(frame, (da_seg_mask, ll_seg_mask), _, _)
+
+            # Save TwinLiteNet output as an image
+            cv2.imwrite(
+                os.path.join(twinlite_dir, f"twinlite_frame_{frame_idx}.png"),
+                img_vis,
             )
-
-        # Save YOLO-annotated frame
-        cv2.imwrite(os.path.join(yolo_dir, f"annotated_frame_{frame_idx}.png"), frame)
-
-        # MiDaS depth estimation
-        depth_map = depth_model(frame)
-        depth_map = depth_map.cpu().numpy()
-
-        # Save depth map as an image
-        depth_map_normalized = cv2.normalize(
-            depth_map, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
-        )
-        cv2.imwrite(
-            os.path.join(depth_dir, f"depth_frame_{frame_idx}.png"),
-            depth_map_normalized,
-        )
-
-        # TwinLiteNet processing (e.g., semantic segmentation or other tasks)
-        twinlite_output = twinlite_model(
-            torch.tensor(frame).permute(2, 0, 1).unsqueeze(0)
-        )
-        twinlite_output = twinlite_output.cpu().detach().numpy()
-
-        # Save TwinLiteNet output as an image
-        twinlite_output_normalized = cv2.normalize(
-            twinlite_output[0, 0], None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
-        )
-        cv2.imwrite(
-            os.path.join(twinlite_dir, f"twinlite_frame_{frame_idx}.png"),
-            twinlite_output_normalized,
-        )
 
         # Append frame data to the JSON structure
         spawn_data.append({"frame": frame_idx, "objects": objects})
@@ -185,11 +220,12 @@ def run_blender() -> None:
 
 if __name__ == "__main__":
     # Define the input video path and output JSON file path
-    video_path = "./Data/Sequences"  # Adjust as needed
+    video_path = "Data/Sequences"  # Adjust as needed
     output_json = "./spawn.json"
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Process the video and generate the JSON file
-    process_video(video_path, output_json)
+    process_video(video_path, output_json, device=dev)
 
     # Run the Blender script
     run_blender()
