@@ -14,6 +14,10 @@ load_ZoeDepth()
 """
 
 import torch
+import sys
+
+# Disable the creation of __pycache__ directories
+sys.dont_write_bytecode = True
 
 
 def refresh_MiDaS() -> None:
@@ -43,7 +47,9 @@ def load_ZoeDepth() -> torch.nn.Module:
     torch.nn.Module
         The ZoeDepth model loaded with pre-trained weights.
     """
-    repo = "isl-org/ZoeDepth"
+    repo = "./Networks/ZoeDepth"  # Local source for ZoeDepth
     # Load the ZoeDepth model with pre-trained weights
-    model_zoe_nk = torch.hub.load(repo, "ZoeD_NK", pretrained=True)
+    model_zoe_nk = torch.hub.load(
+        repo, "ZoeD_NK", pretrained=True, source="local", skip_validation=False
+    )
     return model_zoe_nk

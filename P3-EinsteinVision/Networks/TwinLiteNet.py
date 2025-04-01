@@ -10,8 +10,13 @@ load_TwinLiteNet(weights: str)
     Loads the TwinLiteNetPlus model with the specified pre-trained weights.
 """
 
+import sys
+
 import torch
-from TwinLiteNetPlus.model.model import TwinLiteNetPlus
+from Networks.TwinLiteNetPlus.model.model import TwinLiteNetPlus
+
+# Disable the creation of __pycache__ directories
+sys.dont_write_bytecode = True
 
 
 def load_TwinLiteNet(weights: str = "Pretrained/tlp_medium.pth") -> TwinLiteNetPlus:

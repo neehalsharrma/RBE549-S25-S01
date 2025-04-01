@@ -13,10 +13,14 @@ Functions
 import cv2
 import numpy as np
 import os
+import sys
+
+# Disable the creation of __pycache__ directories
+sys.dont_write_bytecode = True
 
 
 def load_video(
-    video_path: str = "../Data/P3Data/Sequences",
+    video_path: str = "./Data/Sequences",
     video_num: int = 1,
     cam_type: str = "front",
     distorted: bool = False,
@@ -27,7 +31,7 @@ def load_video(
     Parameters
     ----------
     video_path : str, optional
-        The base directory where video sequences are stored (default is '../Data/P3Data/Sequences').
+        The base directory where video sequences are stored (default is './Data/Sequences').
     video_num : int, optional
         The scene number of the video to load (default is 1).
     cam_type : str, optional

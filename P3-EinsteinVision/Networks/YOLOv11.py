@@ -10,7 +10,11 @@ load_model()
     Loads the YOLOv11 model with the specified configuration and weights.
 """
 
+import sys
 from ultralytics import YOLO
+
+# Disable the creation of __pycache__ directories
+sys.dont_write_bytecode = True
 
 
 def load_model() -> YOLO:

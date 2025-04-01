@@ -15,10 +15,15 @@ Dependencies:
 - JSON file containing object spawn data
 """
 
-import bpy
 import json
 import os
-from typing import List, Tuple
+import sys
+from typing import Tuple, List
+
+import bpy
+
+# Disable the creation of __pycache__ directories
+sys.dont_write_bytecode = True
 
 # Dictionary to store relative filepaths for different vehicle types
 # These filepaths point to .blend files containing 3D models of vehicles
@@ -163,7 +168,9 @@ for frame_data in data:
     # Render the scene and save the image
     bpy.ops.render.render(write_still=True)  # Render the scene
     image_name = f"{frame_data['frame']:06d}.png"  # Generate the image name using the frame number
-    image_filepath = os.path.join("./Results/", image_name)  # Construct the file path
+    image_filepath = os.path.join(
+        "./Results/Renders/", image_name
+    )  # Construct the file path
     bpy.data.images["Render Result"].save_render(
         image_filepath
     )  # Save the rendered image
