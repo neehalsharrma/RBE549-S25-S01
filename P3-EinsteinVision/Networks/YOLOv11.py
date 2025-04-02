@@ -30,5 +30,11 @@ def load_model() -> YOLO:
         An instance of the YOLO model loaded with the specified configuration and weights.
     """
     # Initialize the YOLO model with the YAML configuration and load pre-trained weights
-    model = YOLO("yolo11l.yaml").load("yolo11l.pt")
+    # model = YOLO("yolo11l.yaml").load("yolo11l.pt")
+    model = YOLO("yoloe-11m-seg.pt")
+    names = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", 'traffic light',
+             'traffic cone',
+             'traffic sign', 'stop sign', 'person']
+    model.set_classes(names, model.get_text_pe(names))
+
     return model
