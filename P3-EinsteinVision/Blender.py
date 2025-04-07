@@ -25,25 +25,25 @@ import bpy
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
 
-# Dictionary to store relative filepaths for different vehicle types
+# Dictionary to store absolute filepaths for different vehicle types
 # These filepaths point to .blend files containing 3D models of vehicles
 vehicle_filepaths = {
-    "Car": "./Assets/Vehicles/Car.blend",
-    "Truck": "./Assets/Vehicles/Truck.blend",
-    "SUV": "./Assets/Vehicles/SUV.blend",
-    "Motorcycle": "./Assets/Vehicles/Motorcycle.blend",
-    "Bus": "./Assets/Vehicles/Bus.blend",
-    "Bicycle": "./Assets/Vehicles/Bicycle.blend",
-    "Pickup Truck": "./Assets/Vehicles/PickupTruck.blend",
+    "car": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Car.blend",
+    "truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Truck.blend",
+    "suv": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/SUV.blend",
+    "motorcycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Motorcycle.blend",
+    "bus": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bus.blend",
+    "bicycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bicycle.blend",
+    "pickup truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/PickupTruck.blend",
 }
 
-# Dictionary to store relative filepaths for different traffic items
+# Dictionary to store absolute filepaths for different traffic items
 # These filepaths point to .blend files containing 3D models of traffic-related objects
 traffic_item_filepaths = {
-    "Traffic Signal": "./Assets/TrafficItems/TrafficSignal.blend",
-    "Dustbin": "./Assets/TrafficItems/Dustbin.blend",
-    "Traffic Cone": "./Assets/TrafficItems/TrafficCone.blend",
-    "Speed Limit": "./Assets/TrafficItems/SpeedLimitSign.blend",
+    "traffic light": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/TrafficLight.blend",
+    "dustbin": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Dustbin.blend",
+    "traffic cone": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/TrafficCone.blend",
+    "speed limit": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/SpeedLimitSign.blend",
 }
 
 
@@ -88,8 +88,25 @@ def spawn_objects(
             new_obj.data = obj.data.copy()
             new_obj.animation_data_clear()  # Clear any animation data
             new_obj.location = location  # Set the object's location
-            new_obj.rotation_euler = rotation  # Set the object's rotation
-            new_obj.scale = (0.02, 0.02, 0.02)  # Scale the object
+            if filepath in vehicle_filepaths.values():
+                new_obj.rotation_euler = rotation  # Set the object's rotation
+            else:
+                new_obj.rotation_euler = (
+                    rotation[0] + 1.57,
+                    rotation[1],
+                    rotation[2] - 1.57,
+                )  # Rotate x by 90 degrees
+            if filepath in vehicle_filepaths.values():
+                if "Truck.blend" in filepath:  # Check if the vehicle is a truck
+                    new_obj.scale = (0.000964, 0.000964, 0.000964)  # Scale for truck
+                else:
+                    new_obj.scale = (0.02, 0.02, 0.02)  # Scale for other vehicles
+            else:
+                new_obj.scale = (
+                    0.5,
+                    0.5,
+                    0.5,
+                )  # Scale the object to 0.5 if it's not a vehicle
             bpy.context.collection.objects.link(new_obj)  # Link the object to the scene
             spawned_objects.append(new_obj)
 
@@ -106,7 +123,7 @@ def spawn_objects(
 
 
 # Path to the JSON file containing object spawn data
-file_path = "./spawn.json"
+file_path = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/spawn.json"
 
 # Load the JSON file containing object details
 with open(file_path, "r") as file:
@@ -128,7 +145,7 @@ for frame_data in data:
             bpy.data.objects.remove(obj, do_unlink=True)
 
     # Spawn a car object at the origin with a specific rotation
-    spawn_objects(vehicle_filepaths["Car"], (0, 0, 0), (0, 0, 3.14))
+    spawn_objects(vehicle_filepaths["car"], (0, 0, 0), (0, 0, 3.14))
 
     # Set the camera's location and rotation
     camera_location = (0.0, 0.2, 1.4)  # Camera position
@@ -169,7 +186,7 @@ for frame_data in data:
     bpy.ops.render.render(write_still=True)  # Render the scene
     image_name = f"{frame_data['frame']:06d}.png"  # Generate the image name using the frame number
     image_filepath = os.path.join(
-        "./Results/Renders/", image_name
+        "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders/", image_name
     )  # Construct the file path
     bpy.data.images["Render Result"].save_render(
         image_filepath

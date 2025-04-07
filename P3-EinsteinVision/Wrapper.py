@@ -37,19 +37,58 @@ import torch
 from Networks.DataLoader import get_frame, load_video
 from Networks.MiDaS import load_ZoeDepth
 from Networks.ZoeDepth.zoedepth.utils.misc import colorize
-from Networks.TwinLiteNet import load_TwinLiteNet, show_seg_result, preprocess_img, process_output
+from Networks.TwinLiteNet import (
+    load_TwinLiteNet,
+    show_seg_result,
+    preprocess_img,
+    process_output,
+)
 from Networks.YOLOv11 import load_model as load_yolo
 from tqdm import tqdm  # For progress bar
+
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
 
-yolo = False
+yolo = True
 MiDaS = True
 twin_lite = False
 
 
-def process_video(video_path: str, output_json: str, device: torch.device = torch.device('cpu')) -> None:
+def load_calibration_matrix(data_path: str = "./Data/Calib/") -> np.ndarray:
+    """
+    Load the calibration matrix from the given path and return the calibration matrix as a NumPy array.
+
+    Parameters
+    ----------
+    data_path : str, optional
+        The relative path to the data directory (default is './Data/Calib/').
+
+    Returns
+    -------
+    np.ndarray
+        The calibration matrix as a NumPy array.
+    """
+    # Construct the calibration file path
+    calibration_file = data_path + "front_cal.txt"
+    # Read the calibration file
+    with open(calibration_file, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+        # Initialize the calibration matrix
+        K = np.zeros((3, 3), dtype=np.float32)
+        # Populate the calibration matrix with values from the file
+        for i, line in enumerate(lines):
+            values = list(map(float, line.split()))
+            K[i] = np.array(values)
+    return K
+
+
+def process_video(
+    video_path: str, output_json: str, device: torch.device = torch.device("cpu")
+) -> None:
     """
     Process a video and generate a JSON file with object data.
 
@@ -69,8 +108,8 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
     None
     """
     # Load the video and get the total number of frames
-    video = 1
-    cap, num_frames = load_video(video_path=video_path, video_num=1)
+    video = 5
+    cap, num_frames = load_video(video_path=video_path, video_num=video)
     print(f"Loaded video with {num_frames} frames.")
 
     # Load the models
@@ -80,10 +119,14 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
         depth_model = load_ZoeDepth()
     if twin_lite:
         twinlite_model = load_TwinLiteNet(
-            weights="Networks/Pretrained/tlp_medium.pth",
-            config="medium",
-            dev=device
+            weights="Networks/Pretrained/tlp_medium.pth", config="medium"
         )
+
+    # Load the calibration matrix
+    K = load_calibration_matrix()
+    fx, fy = K[0, 0], K[1, 1]
+    cx, cy = K[0, 2], K[1, 2]
+    print(f"Calibration matrix loaded: fx={fx}, fy={fy}, cx={cx}, cy={cy}")
 
     # Initialize the JSON data structure
     spawn_data = []
@@ -103,19 +146,24 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
         if frame is None:
             continue
 
+        print(f"Processing frame {frame_idx}...")  # Debug: Frame processing start
+
+        objects = []  # Initialize objects for this frame
+
         if yolo:
+            print(f"Running YOLO on frame {frame_idx}...")  # Debug: YOLO start
             yolo_frame = frame.copy()
             # YOLOv11 object detection
             detections = yolo_model.predict(frame, verbose=False)
-            objects = []
+            print(f"YOLO completed for frame {frame_idx}.")  # Debug: YOLO end
             for det in detections[0].boxes:
-                obj_type = det.cls  # Object class
-
-                bbox = det.xyxy.cpu().numpy()  # Bounding box coordinates
+                obj_type = det.cls
+                bbox = det.xyxy.cpu().numpy()
+                x, y = float(bbox[0][0]), float(bbox[0][1])
                 objects.append(
                     {
                         "type": yolo_model.names[int(obj_type)],
-                        "position": {"x": bbox[0][0], "y": bbox[0][1], "z": 0},
+                        "position": {"x": x, "y": y, "z": 0},  # Initialize z as 0
                         "rotation": {"x": 0, "y": 0, "z": 0},
                         "scale": {"x": 1, "y": 1, "z": 1},
                     }
@@ -139,44 +187,59 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
                 )
 
             # Save YOLO-annotated frame
-            cv2.imwrite(os.path.join(yolo_dir, f"annotated_frame_{frame_idx}.png"), yolo_frame)
+            cv2.imwrite(
+                os.path.join(yolo_dir, f"annotated_frame_{frame_idx}.png"), yolo_frame
+            )
 
         if MiDaS:
+            print(f"Running MiDaS on frame {frame_idx}...")  # Debug: MiDaS start
             midas_frame = frame.copy()
-            # midas_frame = cv2.resize(midas_frame, (512, 384)).astype(np.float32) / 255
             midas_frame = midas_frame.astype(np.float32) / 255
             batched_frame = torch.from_numpy(midas_frame).permute(2, 0, 1).unsqueeze(0)
 
             def get_depth_from_prediction(pred):
                 if isinstance(pred, torch.Tensor):
-                    pred = pred  # pass
+                    pred = pred
                 elif isinstance(pred, (list, tuple)):
                     pred = pred[-1]
                 elif isinstance(pred, dict):
-                    pred = pred['metric_depth'] if 'metric_depth' in pred else pred['out']
+                    pred = (
+                        pred["metric_depth"] if "metric_depth" in pred else pred["out"]
+                    )
                 else:
                     raise NotImplementedError(f"Unknown output type {type(pred)}")
                 return pred
 
-            # MiDaS depth estimation
             depth_map = depth_model.infer(batched_frame)
             depth_map = get_depth_from_prediction(depth_map)
             depth_map = depth_map.detach().cpu().squeeze().numpy()
-            depth_map = np.astype(depth_map * 255, np.uint16)
-            colorized = colorize(depth_map, cmap='viridis')
+
             # Save depth map as an image
-            cv2.imwrite(
-                os.path.join(depth_dir, f"depth_frame_16_{frame_idx}.png"),
-                depth_map)
-            colorized = cv2.cvtColor(colorized, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(
-                os.path.join(depth_dir, f"depth_frame_color_{frame_idx}.png"),
-                colorized)
+            depth_colored = colorize(
+                depth_map, cmap="plasma"
+            )  # Apply colormap for visualization
+            depth_output_path = os.path.join(depth_dir, f"depth_frame_{frame_idx}.png")
+            plt.imsave(depth_output_path, depth_colored)
+            print(f"MiDaS completed for frame {frame_idx}.")  # Debug: MiDaS end
+
+            # Update z-coordinate for each object using the depth map
+            for obj in objects:
+                x, y = int(obj["position"]["x"]), int(obj["position"]["y"])
+                if 0 <= y < depth_map.shape[0] and 0 <= x < depth_map.shape[1]:
+                    depth = float(depth_map[y, x])  # Depth value becomes y
+                    obj["position"]["y"] = depth  # Assign depth to y
+                    obj["position"]["z"] = float((x - cx) * depth / fx)  # x becomes z
+                    obj["position"]["x"] = (
+                        float((y - cy) * depth / fy) * 10
+                    )  # z becomes x
+
         if twin_lite:
             img, pad_h, pad_w, height, width, ratio = preprocess_img(frame)
             # TwinLiteNet processing (e.g., semantic segmentation or other tasks)
             twinlite_output = twinlite_model(img)
-            da_seg_mask, ll_seg_mask = process_output(twinlite_output, pad_h, pad_w, height, width, ratio)
+            da_seg_mask, ll_seg_mask = process_output(
+                twinlite_output, pad_h, pad_w, height, width, ratio
+            )
 
             img_vis = show_seg_result(frame, (da_seg_mask, ll_seg_mask), 0, 0)
 
@@ -186,14 +249,15 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
                 img_vis,
             )
 
-        continue
+        print(f"Frame {frame_idx} processing completed.")  # Debug: Frame processing end
 
-        # Append frame data to the JSON structure
         spawn_data.append({"frame": frame_idx, "objects": objects})
 
     # Save the JSON data to the specified file
     with open(output_json, "w") as json_file:
-        json.dump(spawn_data, json_file, indent=4)
+        json.dump(
+            spawn_data, json_file, indent=4, default=float
+        )  # Ensure serialization
     print(f"Saved spawn data to {output_json}")
 
 
@@ -229,4 +293,4 @@ if __name__ == "__main__":
     process_video(video_path, output_json, device=dev)
 
     # Run the Blender script
-    run_blender()
+    # run_blender()

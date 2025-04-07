@@ -55,4 +55,3 @@ def load_ZoeDepth() -> torch.nn.Module:
     model_zoe.train_midas = False
     model_zoe.eval()
     return model_zoe
-

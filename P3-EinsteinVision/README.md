@@ -49,7 +49,7 @@ This folder contains all the static assets required for visualization, including
    pip install -r requirements.txt
    ```
 
-   **Note:** Replace `/snap/blender/current/2.93/python/bin/python3.9` with the path to Blender's Python interpreter on your system. You can locate it by running:
+   **Note:** Replace `/snap/blender/current/4.4/python/bin/python3.11` with the path to Blender's Python interpreter on your system. You can locate it by running:
 
    ```sh
    which blender
@@ -57,4 +57,22 @@ This folder contains all the static assets required for visualization, including
 
    Then navigate to the `python/bin/` directory inside Blender's installation folder.
 
-2. **Execution**
+2. **Execution**  
+   Run the visualization system by executing the `Blender.py` script with Blender's Python interpreter:
+
+   ```sh
+   /snap/blender/current/4.4/python/bin/python3.11 Blender.py
+   ```
+
+   **Note:** Ensure that all required assets are in the `Assets/` folder and the trained networks are in the `Networks/` folder before running the script.
+
+3. **Output**  
+   The results will be saved in the `Results/` folder:
+
+4. **Troubleshooting**  
+   If you encounter issues, verify the following:
+   - All dependencies are installed in the virtual environment.
+   - The paths to assets and networks are correctly configured in the `Blender.py` script.
+   - Blender's Python interpreter is being used to execute the script.
+
+
