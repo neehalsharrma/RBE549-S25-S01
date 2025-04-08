@@ -213,7 +213,7 @@ def main() -> None:
     with open(SPAWN_JSON_PATH, "r") as file:
         data = json.load(file)
 
-    VIDEO_NUMBER = 5
+    VIDEO_NUMBER = 7
 
     # Define the output directory for renders based on the video number
     render_output_dir = f"{RENDER_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}"

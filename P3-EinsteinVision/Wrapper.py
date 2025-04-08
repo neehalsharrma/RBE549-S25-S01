@@ -146,7 +146,7 @@ def process_video(
     os.makedirs(twinlite_dir, exist_ok=True)
 
     # Process each frame in the video
-    for frame_idx in tqdm(range(0, 20, 5)):
+    for frame_idx in tqdm(range(num_frames)):
         frame = get_frame(cap, frame_idx)
         if frame is None:
             continue
@@ -239,6 +239,9 @@ def process_video(
                     )  # z becomes x
 
         if USE_TWIN_LITE:
+            print(
+                f"Running TwinLiteNet on frame {frame_idx}..."
+            )  # Debug: TwinLiteNet start
             img, pad_h, pad_w, height, width, ratio = preprocess_img(frame)
             # TwinLiteNet processing (e.g., semantic segmentation or other tasks)
             twinlite_output = twinlite_model(img)
@@ -253,6 +256,9 @@ def process_video(
                 os.path.join(twinlite_dir, f"twinlite_frame_{frame_idx}.png"),
                 img_vis,
             )
+            print(
+                f"TwinLiteNet completed for frame {frame_idx}."
+            )  # Debug: TwinLiteNet end
 
         print(f"Frame {frame_idx} processing completed.")  # Debug: Frame processing end
 
@@ -316,7 +322,7 @@ if __name__ == "__main__":
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Assign the video number to process
-    VIDEO_NUMBER = 5  # Change this value to process a different video
+    VIDEO_NUMBER = 7  # Change this value to process a different video
 
     # Assign the models to use
     USE_YOLO = True  # YOLO
