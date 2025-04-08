@@ -15,6 +15,3 @@
 [submodule "P3-EinsteinVision/Networks/openpifpaf"]
 	path = P3-EinsteinVision/Networks/openpifpaf
 	url = git@github.com:openpifpaf/openpifpaf.git
-[submodule "P3-EinsteinVision/yolo3d-lightning"]
-	path = P3-EinsteinVision/yolo3d-lightning
-	url = https://github.com/ruhyadi/yolo3d-lightning
