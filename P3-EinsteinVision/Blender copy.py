@@ -29,30 +29,23 @@ sys.dont_write_bytecode = True
 # Dictionary to store absolute filepaths for different vehicle types
 # These filepaths point to .blend files containing 3D models of vehicles
 vehicle_filepaths = {
-    "car": "./Assets/Vehicles/Car.blend",
-    "truck": "./Assets/Vehicles/Truck.blend",
-    "suv": "./Assets/Vehicles/SUV.blend",
-    "motorcycle": "./Assets/Vehicles/Motorcycle.blend",
-    "bus": "./Assets/Vehicles/Bus.blend",
-    "bicycle": "./Assets/Vehicles/Bicycle.blend",
-    "pickup truck": "./Assets/Vehicles/PickupTruck.blend",
+    "car": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Car.blend",
+    "truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Truck.blend",
+    "suv": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/SUV.blend",
+    "motorcycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Motorcycle.blend",
+    "bus": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bus.blend",
+    "bicycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bicycle.blend",
+    "pickup truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/PickupTruck.blend",
 }
 
 # Dictionary to store absolute filepaths for different traffic items
 # These filepaths point to .blend files containing 3D models of traffic-related objects
 traffic_item_filepaths = {
-    "traffic light": "./Assets/TrafficLight.blend",
-    "dustbin": "./Assets/Dustbin.blend",
-    "traffic cone": "./Assets/TrafficCone.blend",
-    "speed limit": "./Assets/SpeedLimitSign.blend",
+    "traffic light": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/TrafficLight.blend",
+    "dustbin": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Dustbin.blend",
+    "traffic cone": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/TrafficCone.blend",
+    "speed limit": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/SpeedLimitSign.blend",
 }
-
-# Global constants
-SPAWN_JSON_PATH = "./spawn.json"
-WRAPPER_SCRIPT_PATH = "./Wrapper.py"
-RENDER_OUTPUT_BASE_DIR = "./Results/Renders"
-FFMPEG_OUTPUT_BASE_DIR = "./Results/FFMPEG"
-VIDEO_NUMBER = 1  # Set the video number for output organization
 
 
 def spawn_objects(
@@ -130,7 +123,7 @@ def spawn_objects(
     return spawned_objects
 
 
-def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) -> None:
+def render_scene(data: List[dict], render_output_dir: str, video_number: int) -> None:
     """
     Render the Blender scene based on the provided data and save the output images.
 
@@ -140,7 +133,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         List of frame data containing object details.
     render_output_dir : str
         Directory to save the rendered images.
-    VIDEO_NUMBER : int
+    video_number : int
         Video number for organizing output directories.
 
     Returns
@@ -189,9 +182,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         print(f"Rendered image {image_name}")
 
     # Generate a video from the rendered images using pyffmpeg
-    output_video_path = (
-        f"{FFMPEG_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}/blender_render_video.mp4"
-    )
+    output_video_path = f"/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/FFMPEG/vid_{video_number}/blender_render_video.mp4"
     os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
     ff = FFmpeg()
     input_pattern = os.path.join(render_output_dir, "%06d.png")
@@ -209,18 +200,22 @@ def main() -> None:
     -------
     None
     """
+    # Path to the JSON file containing object spawn data
+    file_path = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/spawn.json"
+
     # Load the JSON file containing object details
-    with open(SPAWN_JSON_PATH, "r") as file:
+    with open(file_path, "r") as file:
         data = json.load(file)
 
-    VIDEO_NUMBER = 5
+    # Get the video number from the Wrapper.py script
+    video_number = 5  # Ensure this matches the value in Wrapper.py
 
     # Define the output directory for renders based on the video number
-    render_output_dir = f"{RENDER_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}"
+    render_output_dir = f"/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders/vid_{video_number}"
     os.makedirs(render_output_dir, exist_ok=True)
 
     # Render the scene and generate the video
-    render_scene(data, render_output_dir, VIDEO_NUMBER)
+    render_scene(data, render_output_dir, video_number)
 
 
 if __name__ == "__main__":

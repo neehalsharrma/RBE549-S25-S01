@@ -47,15 +47,20 @@ from Networks.YOLOv11 import load_model as load_yolo
 from tqdm import tqdm  # For progress bar
 
 import ssl
+from pyffmpeg import FFmpeg
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
 
-yolo = True
-MiDaS = True
-twin_lite = False
+# Define global constants for model usage
+USE_YOLO = True
+USE_MIDAS = True
+USE_TWIN_LITE = False
+
+# Define the video number as a global constant
+VIDEO_NUMBER = 5
 
 
 def load_calibration_matrix(data_path: str = "./Data/Calib/") -> np.ndarray:
@@ -108,16 +113,16 @@ def process_video(
     None
     """
     # Load the video and get the total number of frames
-    video = 5
+    video = VIDEO_NUMBER  # Use the global constant
     cap, num_frames = load_video(video_path=video_path, video_num=video)
     print(f"Loaded video with {num_frames} frames.")
 
     # Load the models
-    if yolo:
+    if USE_YOLO:
         yolo_model = load_yolo()
-    if MiDaS:
+    if USE_MIDAS:
         depth_model = load_ZoeDepth()
-    if twin_lite:
+    if USE_TWIN_LITE:
         twinlite_model = load_TwinLiteNet(
             weights="Networks/Pretrained/tlp_medium.pth", config="medium"
         )
@@ -150,7 +155,7 @@ def process_video(
 
         objects = []  # Initialize objects for this frame
 
-        if yolo:
+        if USE_YOLO:
             print(f"Running YOLO on frame {frame_idx}...")  # Debug: YOLO start
             yolo_frame = frame.copy()
             # YOLOv11 object detection
@@ -191,7 +196,7 @@ def process_video(
                 os.path.join(yolo_dir, f"annotated_frame_{frame_idx}.png"), yolo_frame
             )
 
-        if MiDaS:
+        if USE_MIDAS:
             print(f"Running MiDaS on frame {frame_idx}...")  # Debug: MiDaS start
             midas_frame = frame.copy()
             midas_frame = midas_frame.astype(np.float32) / 255
@@ -233,7 +238,7 @@ def process_video(
                         float((y - cy) * depth / fy) * 10
                     )  # z becomes x
 
-        if twin_lite:
+        if USE_TWIN_LITE:
             img, pad_h, pad_w, height, width, ratio = preprocess_img(frame)
             # TwinLiteNet processing (e.g., semantic segmentation or other tasks)
             twinlite_output = twinlite_model(img)
@@ -261,26 +266,47 @@ def process_video(
     print(f"Saved spawn data to {output_json}")
 
 
-def run_blender() -> None:
+def generate_video_from_frames(
+    frames_dir: str, output_video: str, fps: int = 30
+) -> None:
     """
-    Execute the Blender script to render 3D scenes.
+    Generate a video from a directory of frames using the pyffmpeg library.
 
-    This function runs the Blender script (`Blender.py`) in background mode.
-    The script uses the `spawn.json` file as its input.
+    Parameters
+    ----------
+    frames_dir : str
+        Path to the directory containing the frames.
+    output_video : str
+        Path to the output video file.
+    fps : int, optional
+        Frames per second for the output video (default is 30).
 
     Returns
     -------
     None
     """
-    # Define the path to the Blender script
-    blender_script = "./Blender.py"
+    # Create the output directory if it doesn't exist
+    output_dir = os.path.dirname(output_video)
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Run the Blender script
-    subprocess.run(
-        ["blender", "--background", "--python", blender_script],
-        check=True,  # Ensure the command raises an error if it fails
+    # Determine the input pattern based on the type of frames
+    if "YOLO" in frames_dir:
+        input_pattern = os.path.join(frames_dir, "annotated_frame_%d.png")
+    elif "MiDaS" in frames_dir:
+        input_pattern = os.path.join(frames_dir, "depth_frame_%d.png")
+    elif "TwinLiteNet" in frames_dir:
+        input_pattern = os.path.join(frames_dir, "twinlite_frame_%d.png")
+    else:
+        raise ValueError("Unknown frame type in frames_dir")
+
+    # Initialize pyffmpeg
+    ff = FFmpeg()
+
+    # Use pyffmpeg to generate the video
+    ff.options(
+        f"-y -framerate {fps} -i {input_pattern} -c:v libx264 -pix_fmt yuv420p {output_video}"
     )
-    print("Blender script executed.")
+    print(f"Video generated at {output_video}")
 
 
 if __name__ == "__main__":
@@ -289,8 +315,38 @@ if __name__ == "__main__":
     output_json = "./spawn.json"
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # Assign the video number to process
+    VIDEO_NUMBER = 5  # Change this value to process a different video
+
+    # Assign the models to use
+    USE_YOLO = True  # YOLO
+    USE_MIDAS = True  # MiDaS
+    USE_TWIN_LITE = False  # TwinLiteNet
+
     # Process the video and generate the JSON file
     process_video(video_path, output_json, device=dev)
 
-    # Run the Blender script
-    # run_blender()
+    # Generate video from YOLO-annotated frames
+    if USE_YOLO:
+        yolo_frames_dir = f"./Results/YOLO/vid_{VIDEO_NUMBER}"
+        yolo_video_path = (
+            f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/yolo_annotated_video.mp4"
+        )
+        generate_video_from_frames(yolo_frames_dir, yolo_video_path)
+
+    # Generate video from MiDaS depth outputs
+    if USE_MIDAS:
+        midas_frames_dir = f"./Results/MiDaS/vid_{VIDEO_NUMBER}"
+        midas_video_path = f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/midas_depth_video.mp4"
+        generate_video_from_frames(midas_frames_dir, midas_video_path)
+
+    # Generate video from TwinLiteNet outputs
+    if USE_TWIN_LITE:
+        twinlite_frames_dir = f"./Results/TwinLiteNet/vid_{VIDEO_NUMBER}"
+        twinlite_video_path = (
+            f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/twinlite_output_video.mp4"
+        )
+        generate_video_from_frames(twinlite_frames_dir, twinlite_video_path)
+
+    # Run the Blender script to render 3D scenes
+    print("Processing completed. Please run the Blender script to render 3D scenes.")
