@@ -6,6 +6,15 @@
 [submodule "P3-EinsteinVision/Networks/TwinLiteNetPlus"]
 	path = P3-EinsteinVision/Networks/TwinLiteNetPlus
 	url = git@github.com:chequanghuy/TwinLiteNetPlus.git
-[submodule "P3-EinsteinVision/Networks/ZoeDepth"]
-	path = P3-EinsteinVision/Networks/ZoeDepth
-	url = https://github.com/isl-org/ZoeDepth.git
+[submodule "P3-EinsteinVision/Networks/--force"]
+	path = P3-EinsteinVision/Networks/--force
+	url = git@github.com:apple/ml-depth-pro.git
+[submodule "P3-EinsteinVision/Networks/DepthPro"]
+	path = P3-EinsteinVision/Networks/DepthPro
+	url = git@github.com:apple/ml-depth-pro.git
+[submodule "P3-EinsteinVision/Networks/openpifpaf"]
+	path = P3-EinsteinVision/Networks/openpifpaf
+	url = git@github.com:openpifpaf/openpifpaf.git
+[submodule "P3-EinsteinVision/yolo3d-lightning"]
+	path = P3-EinsteinVision/yolo3d-lightning
+	url = https://github.com/ruhyadi/yolo3d-lightning

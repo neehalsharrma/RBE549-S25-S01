@@ -32,9 +32,9 @@ def load_model() -> YOLO:
     # Initialize the YOLO model with the YAML configuration and load pre-trained weights
     # model = YOLO("yolo11l.yaml").load("yolo11l.pt")
     model = YOLO("yoloe-11m-seg.pt")
-    names = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", 'traffic light',
+    names = ["person", "bicycle", "car", "motorcycle", "bus", "train", "truck", 'traffic light',
              'traffic cone',
-             'traffic sign', 'stop sign', 'person']
+             'traffic sign', 'stop sign', 'person', 'speed limit sign', 'pickup truck', 'trash can']
     model.set_classes(names, model.get_text_pe(names))
-
+    model.eval()
     return model

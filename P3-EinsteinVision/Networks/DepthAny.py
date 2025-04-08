@@ -15,27 +15,11 @@ load_ZoeDepth()
 
 import torch
 import sys
-import matplotlib.pyplot
+
 import numpy as np
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
-
-
-def refresh_MiDaS():
-    """
-    Refresh the MiDaS repository.
-
-    This function forces a fresh download of the MiDaS repository and its associated
-    model weights.
-
-    Returns
-    -------
-    None
-    """
-    # Trigger a fresh download of the MiDaS repository
-    torch.hub.help("intel-isl/MiDaS", "DPT_BEiT_L_384", force_reload=True)
-
 
 def load_ZoeDepth() -> torch.nn.Module:
     """
@@ -56,3 +40,14 @@ def load_ZoeDepth() -> torch.nn.Module:
     model_zoe.eval()
     return model_zoe
 
+
+def get_depth_from_prediction(pred):
+    if isinstance(pred, torch.Tensor):
+        pred = pred  # pass
+    elif isinstance(pred, (list, tuple)):
+        pred = pred[-1]
+    elif isinstance(pred, dict):
+        pred = pred['metric_depth'] if 'metric_depth' in pred else pred['out']
+    else:
+        raise NotImplementedError(f"Unknown output type {type(pred)}")
+    return pred

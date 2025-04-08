@@ -24,7 +24,7 @@ def load_video(
         video_num: int = 1,
         cam_type: str = "front",
         distorted: bool = False,
-) -> tuple[cv2.VideoCapture, int]:
+) -> tuple[cv2.VideoCapture, int, int, int]:
     """
     Load a video file and return a video capture object and the number of frames.
 
@@ -41,8 +41,9 @@ def load_video(
 
     Returns
     -------
-    tuple[cv2.VideoCapture, int]
-        A tuple containing the video capture object and the total number of frames in the video.
+    tuple[cv2.VideoCapture, int, int, int]
+        A tuple containing the video capture object and the total number of
+        frames in the video. Also returns the height and width of the video frames.
 
     Raises
     ------
@@ -67,7 +68,10 @@ def load_video(
     # Get the total number of frames in the video
     num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    return cap, num_frames
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    
+    return cap, num_frames, h, w
 
 
 def get_frame(cap: cv2.VideoCapture, frame_num: int) -> np.ndarray or None:
@@ -113,3 +117,31 @@ def get_frame(cap: cv2.VideoCapture, frame_num: int) -> np.ndarray or None:
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     return frame
+
+
+def load_calibration_matrix(data_path: str = "../Data/Calib/front_cal.txt") -> np.ndarray:
+    """
+    Load the calibration matrix from the given path and return the calibration matrix as a NumPy array.
+
+    Parameters
+    ----------
+    data_path : str, optional
+        The relative path to the data directory (default is 'Data/').
+
+    Returns
+    -------
+    np.ndarray
+        The calibration matrix as a NumPy array.
+    """
+    # Construct the calibration file path
+    calibration_file = data_path
+    # Read the calibration file
+    with open(calibration_file, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+        # Initialize the calibration matrix
+        K = np.zeros((3, 3), dtype=np.float32)
+        # Populate the calibration matrix with values from the file
+        for i, line in enumerate(lines):
+            values = list(map(float, line.split()))
+            K[i] = np.array(values)
+    return K

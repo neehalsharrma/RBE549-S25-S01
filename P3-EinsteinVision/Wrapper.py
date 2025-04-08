@@ -26,17 +26,22 @@ Functions
 """
 
 import json
+from json import encoder
+
+encoder.FLOAT_REPR = lambda o: format(o, '.2f')
 import os
 import subprocess
 import sys
+sys.path.append('Networks/TwinLiteNetPlus')
+sys.path.append('Networks/openpifpaf/src/')
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from Networks.DataLoader import get_frame, load_video
-from Networks.MiDaS import load_ZoeDepth
-from Networks.ZoeDepth.zoedepth.utils.misc import colorize
+import matplotlib
+from Networks.DataLoader import get_frame, load_video, load_calibration_matrix
+from Networks.DepthModel import load_depthmodel
+
 from Networks.TwinLiteNet import load_TwinLiteNet, show_seg_result, preprocess_img, process_output
 from Networks.YOLOv11 import load_model as load_yolo
 from tqdm import tqdm  # For progress bar
@@ -44,12 +49,13 @@ from tqdm import tqdm  # For progress bar
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
 
-yolo = False
-MiDaS = True
-twin_lite = False
+yolo = True
+run_depth = False
+twin_lite = True
 
 
-def process_video(video_path: str, output_json: str, device: torch.device = torch.device('cpu')) -> None:
+def process_video(video_path: str, video_num: int, output_json: str,
+                  device: torch.device = torch.device('cpu')) -> None:
     """
     Process a video and generate a JSON file with object data.
 
@@ -68,16 +74,19 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
     -------
     None
     """
+
     # Load the video and get the total number of frames
-    video = 1
-    cap, num_frames = load_video(video_path=video_path, video_num=1)
+    cap, num_frames, h, w = load_video(video_path=video_path, video_num=video_num)
     print(f"Loaded video with {num_frames} frames.")
 
     # Load the models
     if yolo:
         yolo_model = load_yolo()
-    if MiDaS:
-        depth_model = load_ZoeDepth()
+    if run_depth:
+        depth_model, imgprocessor = load_depthmodel()
+        intrinsics = load_calibration_matrix("Data/Calib/front_cal.txt")
+        f_x = intrinsics[0][0]
+
     if twin_lite:
         twinlite_model = load_TwinLiteNet(
             weights="Networks/Pretrained/tlp_medium.pth",
@@ -88,17 +97,25 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
     # Initialize the JSON data structure
     spawn_data = []
 
+    cmap = matplotlib.colormaps.get_cmap('viridis')
+
     # Create directories for saving outputs of each model
     results_dir = "./Results"
-    yolo_dir = os.path.join(results_dir, f"YOLO/vid_{video}")
-    depth_dir = os.path.join(results_dir, f"MiDaS/vid_{video}")
-    twinlite_dir = os.path.join(results_dir, f"TwinLiteNet/vid_{video}")
+    jsons_dir = os.path.join(results_dir, "jsons")
+    yolo_dir = os.path.join(results_dir, f"YOLO/vid_{video_num}")
+    depth_dir = os.path.join(results_dir, f"DepthPro/vid_{video_num}")
+    twinlite_dir_base = os.path.join(results_dir, f"TwinLiteNet/vid_{video_num}")
+    twinlite_dir_imgs = os.path.join(twinlite_dir_base, 'imgs')
+    twinlite_dir_masks = os.path.join(twinlite_dir_base, 'masks')
+
     os.makedirs(yolo_dir, exist_ok=True)
     os.makedirs(depth_dir, exist_ok=True)
-    os.makedirs(twinlite_dir, exist_ok=True)
+    os.makedirs(twinlite_dir_imgs, exist_ok=True)
+    os.makedirs(twinlite_dir_masks, exist_ok=True)
+    os.makedirs(jsons_dir, exist_ok=True)
 
     # Process each frame in the video
-    for frame_idx in tqdm(range(0, 20, 5)):
+    for frame_idx in tqdm(range(0, num_frames, 5)):
         frame = get_frame(cap, frame_idx)
         if frame is None:
             continue
@@ -112,10 +129,11 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
                 obj_type = det.cls  # Object class
 
                 bbox = det.xyxy.cpu().numpy()  # Bounding box coordinates
+                bbox.astype(float)
                 objects.append(
                     {
                         "type": yolo_model.names[int(obj_type)],
-                        "position": {"x": bbox[0][0], "y": bbox[0][1], "z": 0},
+                        "position": {"x": float(bbox[0][0]), "y": float(bbox[0][1]), "z": 0},
                         "rotation": {"x": 0, "y": 0, "z": 0},
                         "scale": {"x": 1, "y": 1, "z": 1},
                     }
@@ -138,63 +156,73 @@ def process_video(video_path: str, output_json: str, device: torch.device = torc
                     2,
                 )
 
+            yolo_frame = cv2.cvtColor(yolo_frame, cv2.COLOR_RGB2BGR)
             # Save YOLO-annotated frame
             cv2.imwrite(os.path.join(yolo_dir, f"annotated_frame_{frame_idx}.png"), yolo_frame)
 
-        if MiDaS:
-            midas_frame = frame.copy()
-            # midas_frame = cv2.resize(midas_frame, (512, 384)).astype(np.float32) / 255
-            midas_frame = midas_frame.astype(np.float32) / 255
-            batched_frame = torch.from_numpy(midas_frame).permute(2, 0, 1).unsqueeze(0)
+        if run_depth:
+            depth_frame = frame.copy()
+            inputs = imgprocessor(images=depth_frame, return_tensors="pt")
 
-            def get_depth_from_prediction(pred):
-                if isinstance(pred, torch.Tensor):
-                    pred = pred  # pass
-                elif isinstance(pred, (list, tuple)):
-                    pred = pred[-1]
-                elif isinstance(pred, dict):
-                    pred = pred['metric_depth'] if 'metric_depth' in pred else pred['out']
-                else:
-                    raise NotImplementedError(f"Unknown output type {type(pred)}")
-                return pred
+            with torch.no_grad():
+                # depth estimation
+                # depth = depth_model.infer_image(depth_frame, p_x) # HxW depth map in meters in numpy
+                output = depth_model(**inputs)
+                output.field_of_view = torch.tensor([f_x])
+            output = imgprocessor.post_process_depth_estimation(output, target_sizes=[(h, w)])
 
-            # MiDaS depth estimation
-            depth_map = depth_model.infer(batched_frame)
-            depth_map = get_depth_from_prediction(depth_map)
-            depth_map = depth_map.detach().cpu().squeeze().numpy()
-            depth_map = np.astype(depth_map * 255, np.uint16)
-            colorized = colorize(depth_map, cmap='viridis')
+            depth = output[0]["predicted_depth"].detach().cpu().numpy()
+
+            np.save(os.path.join(depth_dir,f"depth_{frame_idx}.npy"), depth)
+
+            # Used to check for differences between the two methods of saving the depth map
+            # np.save(os.path.join(depth_dir, f"depth_frame_16_{frame_idx}.npy"), depth.astype(np.uint16))
+            # Colorize the depth map
+            colorized = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0
+            colorized = colorized.astype(np.uint8)
+            colorized = (cmap(colorized)[:, :, :3] * 255).astype(np.uint8)
+
+            depth_map = depth * 255
+            depth_map = depth_map.astype(np.uint16)
+
             # Save depth map as an image
             cv2.imwrite(
                 os.path.join(depth_dir, f"depth_frame_16_{frame_idx}.png"),
                 depth_map)
+
             colorized = cv2.cvtColor(colorized, cv2.COLOR_RGB2BGR)
             cv2.imwrite(
                 os.path.join(depth_dir, f"depth_frame_color_{frame_idx}.png"),
                 colorized)
+
         if twin_lite:
+            # Preprocess the frame for TwinLiteNet
             img, pad_h, pad_w, height, width, ratio = preprocess_img(frame)
-            # TwinLiteNet processing (e.g., semantic segmentation or other tasks)
+
             twinlite_output = twinlite_model(img)
+
             da_seg_mask, ll_seg_mask = process_output(twinlite_output, pad_h, pad_w, height, width, ratio)
 
             img_vis = show_seg_result(frame, (da_seg_mask, ll_seg_mask), 0, 0)
+            img_vis = cv2.cvtColor(img_vis, cv2.COLOR_RGB2BGR)
 
-            # Save TwinLiteNet output as an image
             cv2.imwrite(
-                os.path.join(twinlite_dir, f"twinlite_frame_{frame_idx}.png"),
-                img_vis,
-            )
+                os.path.join(os.path.join(twinlite_dir_imgs, f"twinlite_frame_{frame_idx}.png")),
+                img_vis)
 
-        continue
+            stacked = np.stack((da_seg_mask, ll_seg_mask), axis=0)
+            np.save(os.path.join
+                    (twinlite_dir_masks, f"twinlite_frame_{frame_idx}.npy"), stacked)
 
-        # Append frame data to the JSON structure
-        spawn_data.append({"frame": frame_idx, "objects": objects})
+            # continue
+            # Append frame data to the JSON structure
+            spawn_data.append({"frame": frame_idx, "objects": objects})
 
-    # Save the JSON data to the specified file
-    with open(output_json, "w") as json_file:
-        json.dump(spawn_data, json_file, indent=4)
-    print(f"Saved spawn data to {output_json}")
+            # Save the JSON data to the specified file
+            with open(output_json, "w") as json_file:
+                json.dump(spawn_data, json_file, indent=4)
+            print(f"Saved spawn data to {output_json}")
+    shutil.copy(output_json, os.path.join(results_dir, 'jsons', f"vid_{video_num}.json"))
 
 
 def run_blender() -> None:
@@ -226,7 +254,7 @@ if __name__ == "__main__":
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Process the video and generate the JSON file
-    process_video(video_path, output_json, device=dev)
+    process_video(video_path, 8, output_json, device=dev)
 
     # Run the Blender script
-    run_blender()
+    # run_blender()
