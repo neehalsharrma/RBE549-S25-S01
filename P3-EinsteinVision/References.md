@@ -50,7 +50,7 @@
 
 9. **Blender Python API (bpy)**  
    - Source: [Blender Official Website](https://www.blender.org/)  
-   - Description: Used for rendering 3D scenes and managing Blender objects.
+   - Description: Used for rendering 3D scenes, managing Blender objects, and automating scene generation.
 
 10. **Torchvision**  
     - Source: [Torchvision GitHub Repository](https://github.com/pytorch/vision)  
@@ -75,3 +75,7 @@
 15. **Timm**  
     - Source: [Timm GitHub Repository](https://github.com/rwightman/pytorch-image-models)  
     - Description: Provides pre-trained models and utilities for vision tasks.
+
+16. **PyFFmpeg**  
+    - Source: [PyFFmpeg GitHub Repository](https://github.com/pyffmpeg/pyffmpeg)  
+    - Description: Used for generating videos from annotated frames and rendered images.

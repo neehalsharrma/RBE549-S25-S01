@@ -21,7 +21,6 @@ import sys
 from typing import Tuple, List
 
 import bpy
-from pyffmpeg import FFmpeg  # Import pyffmpeg
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
@@ -46,6 +45,14 @@ traffic_item_filepaths = {
     "traffic cone": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/TrafficCone.blend",
     "speed limit": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/SpeedLimitSign.blend",
 }
+
+# Global constants
+SPAWN_JSON_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/spawn.json"
+WRAPPER_SCRIPT_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Wrapper.py"
+RENDER_OUTPUT_BASE_DIR = (
+    "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders"
+)
+VIDEO_NUMBER = 5  # Set the video number for output organization
 
 
 def spawn_objects(
@@ -181,16 +188,6 @@ def render_scene(data: List[dict], render_output_dir: str, video_number: int) ->
         bpy.data.images["Render Result"].save_render(image_filepath)
         print(f"Rendered image {image_name}")
 
-    # Generate a video from the rendered images using pyffmpeg
-    output_video_path = f"/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/FFMPEG/vid_{video_number}/blender_render_video.mp4"
-    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
-    ff = FFmpeg()
-    input_pattern = os.path.join(render_output_dir, "%06d.png")
-    ff.options(
-        f"-y -framerate 30 -i {input_pattern} -c:v libx264 -pix_fmt yuv420p {output_video_path}"
-    )
-    print(f"Blender render video saved at {output_video_path}")
-
 
 def main() -> None:
     """
@@ -200,22 +197,18 @@ def main() -> None:
     -------
     None
     """
-    # Path to the JSON file containing object spawn data
-    file_path = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/spawn.json"
+    VIDEO_NUMBER = 5  # Set the video number for output organization
 
     # Load the JSON file containing object details
-    with open(file_path, "r") as file:
+    with open(SPAWN_JSON_PATH, "r") as file:
         data = json.load(file)
 
-    # Get the video number from the Wrapper.py script
-    video_number = 5  # Ensure this matches the value in Wrapper.py
-
     # Define the output directory for renders based on the video number
-    render_output_dir = f"/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders/vid_{video_number}"
+    render_output_dir = f"{RENDER_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}"
     os.makedirs(render_output_dir, exist_ok=True)
 
-    # Render the scene and generate the video
-    render_scene(data, render_output_dir, video_number)
+    # Render the scene
+    render_scene(data, render_output_dir, VIDEO_NUMBER)
 
 
 if __name__ == "__main__":
