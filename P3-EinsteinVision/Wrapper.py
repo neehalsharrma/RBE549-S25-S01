@@ -321,7 +321,7 @@ if __name__ == "__main__":
     # Assign the models to use
     USE_YOLO = True  # YOLO
     USE_MIDAS = True  # MiDaS
-    USE_TWIN_LITE = False  # TwinLiteNet
+    USE_TWIN_LITE = True  # TwinLiteNet
 
     # Process the video and generate the JSON file
     process_video(video_path, output_json, device=dev)
