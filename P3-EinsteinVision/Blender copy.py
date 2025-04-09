@@ -15,12 +15,14 @@ Dependencies:
 - JSON file containing object spawn data
 """
 
+import argparse  # Add argparse for command-line arguments
 import json
 import os
 import sys
-from typing import Tuple, List
+from typing import List, Tuple
 
 import bpy
+from pyffmpeg import FFmpeg  # Import pyffmpeg
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
@@ -44,6 +46,7 @@ traffic_item_filepaths = {
     "dustbin": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Dustbin.blend",
     "traffic cone": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/TrafficCone.blend",
     "speed limit": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/SpeedLimitSign.blend",
+    "stop sign": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/StopSign.blend",
 }
 
 # Global constants
@@ -52,7 +55,9 @@ WRAPPER_SCRIPT_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Wrapper.
 RENDER_OUTPUT_BASE_DIR = (
     "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders"
 )
-VIDEO_NUMBER = 5  # Set the video number for output organization
+FFMPEG_OUTPUT_BASE_DIR = (
+    "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/FFMPEG"
+)
 
 
 def spawn_objects(
@@ -130,7 +135,51 @@ def spawn_objects(
     return spawned_objects
 
 
-def render_scene(data: List[dict], render_output_dir: str, video_number: int) -> None:
+def apply_texture_to_object(image_path, obj):
+    """
+    Apply a texture to a given Blender object using an image file.
+
+    This function creates a new material, enables nodes for the material,
+    and assigns an image texture to the material. The texture is then linked
+    to the Principled BSDF shader's Base Color input. Finally, the material
+    is assigned to the specified object.
+
+    Parameters
+    ----------
+    image_path : str
+        The file path to the image to be used as the texture.
+    obj : bpy.types.Object
+        The Blender object to which the texture will be applied.
+
+    Returns
+    -------
+    None
+    """
+    # Create a new material and enable the use of nodes
+    material = bpy.data.materials.new(name="ImageTexture")
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+
+    # Create an Image Texture node and load the image
+    tex_node = nodes.new("ShaderNodeTexImage")
+    tex_node.image = bpy.data.images.load(image_path)
+
+    # Get the Principled BSDF node and link the texture to its Base Color input
+    bsdf_node = nodes.get("Principled BSDF")
+    material.node_tree.links.new(
+        tex_node.outputs["Color"], bsdf_node.inputs["Base Color"]
+    )
+
+    # Assign the material to the object
+    if obj.data.materials:
+        # Replace the first material if the object already has materials
+        obj.data.materials[0] = material
+    else:
+        # Add the new material if the object has no materials
+        obj.data.materials.append(material)
+
+
+def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) -> None:
     """
     Render the Blender scene based on the provided data and save the output images.
 
@@ -140,7 +189,7 @@ def render_scene(data: List[dict], render_output_dir: str, video_number: int) ->
         List of frame data containing object details.
     render_output_dir : str
         Directory to save the rendered images.
-    video_number : int
+    VIDEO_NUMBER : int
         Video number for organizing output directories.
 
     Returns
@@ -188,6 +237,18 @@ def render_scene(data: List[dict], render_output_dir: str, video_number: int) ->
         bpy.data.images["Render Result"].save_render(image_filepath)
         print(f"Rendered image {image_name}")
 
+    # Generate a video from the rendered images using pyffmpeg
+    output_video_path = (
+        f"{FFMPEG_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}/blender_render_video.mp4"
+    )
+    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
+    ff = FFmpeg()
+    input_pattern = os.path.join(render_output_dir, "*.png")
+    ff.options(
+        f"-y -framerate 30 -pattern_type glob -i {input_pattern} -c:v libx264 -r 30 -pix_fmt yuv420p {output_video_path}"
+    )
+    print(f"Blender render video saved at {output_video_path}")
+
 
 def main() -> None:
     """
@@ -197,7 +258,15 @@ def main() -> None:
     -------
     None
     """
-    VIDEO_NUMBER = 5  # Set the video number for output organization
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Render 3D scenes in Blender.")
+    parser.add_argument(
+        "--video", type=int, required=True, help="Video number to process."
+    )
+    args = parser.parse_args()
+
+    # Assign the video number from the argument
+    VIDEO_NUMBER = args.video
 
     # Load the JSON file containing object details
     with open(SPAWN_JSON_PATH, "r") as file:
@@ -207,7 +276,7 @@ def main() -> None:
     render_output_dir = f"{RENDER_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}"
     os.makedirs(render_output_dir, exist_ok=True)
 
-    # Render the scene
+    # Render the scene and generate the video
     render_scene(data, render_output_dir, VIDEO_NUMBER)
 
 
