@@ -15,14 +15,12 @@ Dependencies:
 - JSON file containing object spawn data
 """
 
-import argparse  # Add argparse for command-line arguments
 import json
 import os
 import sys
 from typing import List, Tuple
 
 import bpy
-from pyffmpeg import FFmpeg  # Import pyffmpeg
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
@@ -55,9 +53,7 @@ WRAPPER_SCRIPT_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Wrapper.
 RENDER_OUTPUT_BASE_DIR = (
     "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders"
 )
-FFMPEG_OUTPUT_BASE_DIR = (
-    "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/FFMPEG"
-)
+STOP_SIGN_TEXTURE_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/StopSignImage.png"  # Path to stop sign texture
 
 
 def spawn_objects(
@@ -89,7 +85,9 @@ def spawn_objects(
     """
     # Load objects from the specified .blend file
     with bpy.data.libraries.load(filepath) as (data_from, data_to):
-        data_to.objects = data_from.objects
+        data_to.objects = [
+            obj for obj in data_from.objects if obj not in {"Camera", "Sun"}
+        ]
 
     spawned_objects = []  # List to store the spawned objects
 
@@ -101,25 +99,7 @@ def spawn_objects(
             new_obj.data = obj.data.copy()
             new_obj.animation_data_clear()  # Clear any animation data
             new_obj.location = location  # Set the object's location
-            if filepath in vehicle_filepaths.values():
-                new_obj.rotation_euler = rotation  # Set the object's rotation
-            else:
-                new_obj.rotation_euler = (
-                    rotation[0] + 1.57,
-                    rotation[1],
-                    rotation[2] - 1.57,
-                )  # Rotate x by 90 degrees
-            if filepath in vehicle_filepaths.values():
-                if "Truck.blend" in filepath:  # Check if the vehicle is a truck
-                    new_obj.scale = (0.000964, 0.000964, 0.000964)  # Scale for truck
-                else:
-                    new_obj.scale = (0.02, 0.02, 0.02)  # Scale for other vehicles
-            else:
-                new_obj.scale = (
-                    0.5,
-                    0.5,
-                    0.5,
-                )  # Scale the object to 0.5 if it's not a vehicle
+            new_obj.rotation_euler = rotation  # Set the object's rotation
             bpy.context.collection.objects.link(new_obj)  # Link the object to the scene
             spawned_objects.append(new_obj)
 
@@ -128,7 +108,7 @@ def spawn_objects(
                 new_child_obj = child_obj.copy()
                 new_child_obj.data = child_obj.data.copy()
                 new_child_obj.animation_data_clear()
-                new_child_obj.parent = new_obj  # Maintain parent-child relationship
+                new_child_obj.parent = new_obj
                 bpy.context.collection.objects.link(new_child_obj)
                 spawned_objects.append(new_child_obj)
 
@@ -205,6 +185,13 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         # Spawn a car object at the origin with a specific rotation
         spawn_objects(vehicle_filepaths["car"], (0, 0, 0), (0, 0, 3.14))
 
+        # Add a Sun light source to the scene
+        sun = bpy.data.lights.new(name="Sun", type="SUN")
+        sun_object = bpy.data.objects.new(name="Sun", object_data=sun)
+        bpy.context.collection.objects.link(sun_object)
+        sun_object.location = (0, 0, 200)  # Position the Sun above the scene
+        sun.energy = 5  # Set the brightness of the Sun
+
         # Set the camera's location and rotation
         camera_location = (0.0, 0.2, 1.4)
         camera_rotation = (1.57, 0.0, 0.0)
@@ -230,6 +217,105 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 continue
             spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
 
+        # Check if a stop sign is detected in the current frame
+        stop_sign_detected = any(
+            obj["type"] == "stop sign" for obj in frame_data["objects"]
+        )
+
+        if stop_sign_detected:
+            # Add image alert on screen if a stop sign is detected
+            # Enable compositing
+            bpy.context.scene.use_nodes = True
+            nodes = bpy.context.scene.node_tree.nodes
+            links = bpy.context.scene.node_tree.links
+
+            # Clear existing nodes
+            for node in nodes:
+                nodes.remove(node)
+
+            # Add render layer node
+            render_layer_node = nodes.new(type="CompositorNodeRLayers")
+            render_layer_node.location = (0, 0)
+
+            # Add image node
+            image_node = nodes.new(type="CompositorNodeImage")
+            image_node.location = (200, 200)
+            image_node.image = bpy.data.images.load(STOP_SIGN_TEXTURE_PATH)
+
+            # Add transform node (NEW: Controls scale/position)
+            transform_node = nodes.new(type="CompositorNodeTransform")
+            transform_node.location = (400, 200)
+            transform_node.inputs["Scale"].default_value = 0.2
+            transform_node.inputs["Y"].default_value = 400
+
+            # Add alpha over node
+            alpha_over_node = nodes.new(type="CompositorNodeAlphaOver")
+            alpha_over_node.location = (600, 0)
+
+            # Add composite output node
+            composite_node = nodes.new(type="CompositorNodeComposite")
+            composite_node.location = (800, 0)
+
+            # Link nodes
+            links.new(render_layer_node.outputs["Image"], alpha_over_node.inputs[1])
+            links.new(
+                image_node.outputs["Image"], transform_node.inputs["Image"]
+            )  # Image → Transform
+            links.new(
+                transform_node.outputs["Image"], alpha_over_node.inputs[2]
+            )  # Transform → Alpha Over
+            links.new(alpha_over_node.outputs["Image"], composite_node.inputs["Image"])
+
+        # Check if a speed limit sign is detected in the current frame
+        speed_limit_detected = any(
+            obj["type"] == "speed limit" for obj in frame_data["objects"]
+        )
+
+        if speed_limit_detected:
+            # Add image alert on screen if a speed limit sign is detected
+            # Enable compositing
+            bpy.context.scene.use_nodes = True
+            nodes = bpy.context.scene.node_tree.nodes
+            links = bpy.context.scene.node_tree.links
+
+            # Clear existing nodes
+            for node in nodes:
+                nodes.remove(node)
+
+            # Add render layer node
+            render_layer_node = nodes.new(type="CompositorNodeRLayers")
+            render_layer_node.location = (0, 0)
+
+            # Add image node
+            image_node = nodes.new(type="CompositorNodeImage")
+            image_node.location = (200, 200)
+            image_node.image = bpy.data.images.load(SPEED_LIMIT_TEXTURE_PATH)
+
+            # Add transform node (NEW: Controls scale/position)
+            transform_node = nodes.new(type="CompositorNodeTransform")
+            transform_node.location = (400, 200)
+            transform_node.inputs["Scale"].default_value = 0.2
+            transform_node.inputs["X"].default_value = 100
+            transform_node.inputs["Y"].default_value = 400
+
+            # Add alpha over node
+            alpha_over_node = nodes.new(type="CompositorNodeAlphaOver")
+            alpha_over_node.location = (600, 0)
+
+            # Add composite output node
+            composite_node = nodes.new(type="CompositorNodeComposite")
+            composite_node.location = (800, 0)
+
+            # Link nodes
+            links.new(render_layer_node.outputs["Image"], alpha_over_node.inputs[1])
+            links.new(
+                image_node.outputs["Image"], transform_node.inputs["Image"]
+            )  # Image → Transform
+            links.new(
+                transform_node.outputs["Image"], alpha_over_node.inputs[2]
+            )  # Transform → Alpha Over
+            links.new(alpha_over_node.outputs["Image"], composite_node.inputs["Image"])
+
         # Render the scene and save the image
         bpy.ops.render.render(write_still=True)
         image_name = f"{frame_data['frame']:06d}.png"
@@ -237,17 +323,31 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         bpy.data.images["Render Result"].save_render(image_filepath)
         print(f"Rendered image {image_name}")
 
-    # Generate a video from the rendered images using pyffmpeg
-    output_video_path = (
-        f"{FFMPEG_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}/blender_render_video.mp4"
-    )
-    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
-    ff = FFmpeg()
-    input_pattern = os.path.join(render_output_dir, "*.png")
-    ff.options(
-        f"-y -framerate 30 -pattern_type glob -i {input_pattern} -c:v libx264 -r 30 -pix_fmt yuv420p {output_video_path}"
-    )
-    print(f"Blender render video saved at {output_video_path}")
+        # Reset compositing and image overlays for the next render
+        scene = bpy.context.scene
+        scene.use_nodes = True
+        nodes = scene.node_tree.nodes
+        links = scene.node_tree.links
+
+        # Clear all newly added nodes in the compositor
+        for node in list(nodes):
+            if node.name not in {"Render Layers", "Composite"}:
+                nodes.remove(node)
+
+        # Ensure the remaining nodes are linked together
+        render_layer_node = nodes.get("Render Layers")
+        composite_node = nodes.get("Composite")
+        if render_layer_node and composite_node:
+            # Clear existing links
+            for link in list(links):
+                links.remove(link)
+            # Link Render Layers to Composite
+            links.new(
+                render_layer_node.outputs["Image"], composite_node.inputs["Image"]
+            )
+
+        if frame_data["frame"] == 10:
+            break
 
 
 def main() -> None:
@@ -258,15 +358,8 @@ def main() -> None:
     -------
     None
     """
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Render 3D scenes in Blender.")
-    parser.add_argument(
-        "--video", type=int, required=True, help="Video number to process."
-    )
-    args = parser.parse_args()
-
     # Assign the video number from the argument
-    VIDEO_NUMBER = args.video
+    VIDEO_NUMBER = 8
 
     # Load the JSON file containing object details
     with open(SPAWN_JSON_PATH, "r") as file:

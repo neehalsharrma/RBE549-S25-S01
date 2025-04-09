@@ -19,10 +19,10 @@ import json
 import os
 import sys
 from typing import Tuple, List
-import argparse  # Add argparse for command-line arguments
+import argparse
 
 import bpy
-from pyffmpeg import FFmpeg  # Import pyffmpeg
+from pyffmpeg import FFmpeg
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
@@ -55,6 +55,10 @@ WRAPPER_SCRIPT_PATH = "./Wrapper.py"
 RENDER_OUTPUT_BASE_DIR = "./Results/Renders"
 FFMPEG_OUTPUT_BASE_DIR = "./Results/FFMPEG"
 VIDEO_NUMBER = 1  # Set the video number for output organization
+STOP_SIGN_TEXTURE_PATH = "./Assets/StopSignImage.png"  # Path to stop sign texture
+SPEED_LIMIT_TEXTURE_PATH = (
+    "./Assets/SpeedLimitSignImage.svg"  # Path to speed limit texture
+)
 
 
 def spawn_objects(
@@ -84,9 +88,11 @@ def spawn_objects(
     list of bpy.types.Object
         A list of the spawned objects, including both top-level objects and their children.
     """
-    # Load objects from the specified .blend file
+    # Load objects from the specified .blend file, excluding the camera
     with bpy.data.libraries.load(filepath) as (data_from, data_to):
-        data_to.objects = data_from.objects
+        data_to.objects = [
+            obj for obj in data_from.objects if obj not in {"Camera", "Sun"}
+        ]
 
     spawned_objects = []  # List to store the spawned objects
 
@@ -184,6 +190,13 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         # Spawn a car object at the origin with a specific rotation
         spawn_objects(vehicle_filepaths["car"], (0, 0, 0), (0, 0, 3.14))
 
+        # Add a Sun light source to the scene
+        sun = bpy.data.lights.new(name="Sun", type="SUN")
+        sun_object = bpy.data.objects.new(name="Sun", object_data=sun)
+        bpy.context.collection.objects.link(sun_object)
+        sun_object.location = (0, 0, 200)  # Position the Sun above the scene
+        sun.energy = 5  # Set the brightness of the Sun
+
         # Set the camera's location and rotation
         camera_location = (0.0, 0.2, 1.4)
         camera_rotation = (1.57, 0.0, 0.0)
@@ -209,62 +222,104 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 continue
             spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
 
-            # Check if a stop sign is detected in the current frame
-            stop_sign_detected = any(
-                obj["type"] == "stop sign" for obj in frame_data["objects"]
-            )
+        # Check if a stop sign is detected in the current frame
+        stop_sign_detected = any(
+            obj["type"] == "stop sign" for obj in frame_data["objects"]
+        )
 
-            if stop_sign_detected:
-                # Add image alert on screen if a stop sign is detected
-                # Enable compositing
-                bpy.context.scene.use_nodes = True
-                nodes = bpy.context.scene.node_tree.nodes
-                links = bpy.context.scene.node_tree.links
+        if stop_sign_detected:
+            # Add image alert on screen if a stop sign is detected
+            # Enable compositing
+            bpy.context.scene.use_nodes = True
+            nodes = bpy.context.scene.node_tree.nodes
+            links = bpy.context.scene.node_tree.links
 
-                # Clear existing nodes
-                for node in nodes:
-                    nodes.remove(node)
+            # Clear existing nodes
+            for node in nodes:
+                nodes.remove(node)
 
-                # Add render layer node
-                render_layer_node = nodes.new(type="CompositorNodeRLayers")
-                render_layer_node.location = (0, 0)
+            # Add render layer node
+            render_layer_node = nodes.new(type="CompositorNodeRLayers")
+            render_layer_node.location = (0, 0)
 
-                # Add image node
-                image_node = nodes.new(type="CompositorNodeImage")
-                image_node.location = (200, 200)
-                image_node.image = bpy.data.images.load(STOP_SIGN_TEXTURE_PATH)
+            # Add image node
+            image_node = nodes.new(type="CompositorNodeImage")
+            image_node.location = (200, 200)
+            image_node.image = bpy.data.images.load(STOP_SIGN_TEXTURE_PATH)
 
-                # Add transform node (NEW: Controls scale/position)
-                transform_node = nodes.new(type="CompositorNodeTransform")
-                transform_node.location = (400, 200)
-                transform_node.inputs["Scale"].default_value = (
-                    0.2,
-                    0.2,
-                )  # Reduce size (adjust as needed)
-                transform_node.inputs["Offset"].default_value = (
-                    0,
-                    400,
-                )  # Move upward (adjust as needed)
+            # Add transform node (NEW: Controls scale/position)
+            transform_node = nodes.new(type="CompositorNodeTransform")
+            transform_node.location = (400, 200)
+            transform_node.inputs["Scale"].default_value = 0.2
+            transform_node.inputs["Y"].default_value = 400
 
-                # Add alpha over node
-                alpha_over_node = nodes.new(type="CompositorNodeAlphaOver")
-                alpha_over_node.location = (600, 0)
+            # Add alpha over node
+            alpha_over_node = nodes.new(type="CompositorNodeAlphaOver")
+            alpha_over_node.location = (600, 0)
 
-                # Add composite output node
-                composite_node = nodes.new(type="CompositorNodeComposite")
-                composite_node.location = (800, 0)
+            # Add composite output node
+            composite_node = nodes.new(type="CompositorNodeComposite")
+            composite_node.location = (800, 0)
 
-                # Link nodes (UPDATED: Insert transform node)
-                links.new(render_layer_node.outputs["Image"], alpha_over_node.inputs[1])
-                links.new(
-                    image_node.outputs["Image"], transform_node.inputs["Image"]
-                )  # Image → Transform
-                links.new(
-                    transform_node.outputs["Image"], alpha_over_node.inputs[2]
-                )  # Transform → Alpha Over
-                links.new(
-                    alpha_over_node.outputs["Image"], composite_node.inputs["Image"]
-                )
+            # Link nodes
+            links.new(render_layer_node.outputs["Image"], alpha_over_node.inputs[1])
+            links.new(
+                image_node.outputs["Image"], transform_node.inputs["Image"]
+            )  # Image → Transform
+            links.new(
+                transform_node.outputs["Image"], alpha_over_node.inputs[2]
+            )  # Transform → Alpha Over
+            links.new(alpha_over_node.outputs["Image"], composite_node.inputs["Image"])
+
+        # Check if a speed limit sign is detected in the current frame
+        speed_limit_detected = any(
+            obj["type"] == "speed limit" for obj in frame_data["objects"]
+        )
+
+        if speed_limit_detected:
+            # Add image alert on screen if a speed limit sign is detected
+            # Enable compositing
+            bpy.context.scene.use_nodes = True
+            nodes = bpy.context.scene.node_tree.nodes
+            links = bpy.context.scene.node_tree.links
+
+            # Clear existing nodes
+            for node in nodes:
+                nodes.remove(node)
+
+            # Add render layer node
+            render_layer_node = nodes.new(type="CompositorNodeRLayers")
+            render_layer_node.location = (0, 0)
+
+            # Add image node
+            image_node = nodes.new(type="CompositorNodeImage")
+            image_node.location = (200, 200)
+            image_node.image = bpy.data.images.load(SPEED_LIMIT_TEXTURE_PATH)
+
+            # Add transform node (NEW: Controls scale/position)
+            transform_node = nodes.new(type="CompositorNodeTransform")
+            transform_node.location = (400, 200)
+            transform_node.inputs["Scale"].default_value = 0.2
+            transform_node.inputs["X"].default_value = 100
+            transform_node.inputs["Y"].default_value = 400
+
+            # Add alpha over node
+            alpha_over_node = nodes.new(type="CompositorNodeAlphaOver")
+            alpha_over_node.location = (600, 0)
+
+            # Add composite output node
+            composite_node = nodes.new(type="CompositorNodeComposite")
+            composite_node.location = (800, 0)
+
+            # Link nodes
+            links.new(render_layer_node.outputs["Image"], alpha_over_node.inputs[1])
+            links.new(
+                image_node.outputs["Image"], transform_node.inputs["Image"]
+            )  # Image → Transform
+            links.new(
+                transform_node.outputs["Image"], alpha_over_node.inputs[2]
+            )  # Transform → Alpha Over
+            links.new(alpha_over_node.outputs["Image"], composite_node.inputs["Image"])
 
         # Render the scene and save the image
         bpy.ops.render.render(write_still=True)
@@ -272,6 +327,32 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         image_filepath = os.path.join(render_output_dir, image_name)
         bpy.data.images["Render Result"].save_render(image_filepath)
         print(f"Rendered image {image_name}")
+
+        # Reset compositing and image overlays for the next render
+        scene = bpy.context.scene
+        scene.use_nodes = True
+        nodes = scene.node_tree.nodes
+        links = scene.node_tree.links
+
+        # Clear all newly added nodes in the compositor
+        for node in list(nodes):
+            if node.name not in {"Render Layers", "Composite"}:
+                nodes.remove(node)
+
+        # Ensure the remaining nodes are linked together
+        render_layer_node = nodes.get("Render Layers")
+        composite_node = nodes.get("Composite")
+        if render_layer_node and composite_node:
+            # Clear existing links
+            for link in list(links):
+                links.remove(link)
+            # Link Render Layers to Composite
+            links.new(
+                render_layer_node.outputs["Image"], composite_node.inputs["Image"]
+            )
+
+        if frame_data["frame"] == 10:
+            break
 
     # Generate a video from the rendered images using pyffmpeg
     output_video_path = (
