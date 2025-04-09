@@ -212,10 +212,49 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 continue
             spawned_objects = spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
 
-            # Apply stop sign texture if the object is a stop sign
-            if obj["type"] == "stop sign":
-                for spawned_obj in spawned_objects:
-                    apply_texture_to_object(STOP_SIGN_TEXTURE_PATH, spawned_obj)
+            # Check if a stop sign is detected in the current frame
+            stop_sign_detected = any(obj["type"] == "stop sign" for obj in frame_data["objects"])
+
+            if stop_sign_detected:
+                # Add image alert on screen if a stop sign is detected
+                # Enable compositing
+                bpy.context.scene.use_nodes = True
+                nodes = bpy.context.scene.node_tree.nodes
+                links = bpy.context.scene.node_tree.links
+
+                # Clear existing nodes
+                for node in nodes:
+                    nodes.remove(node)
+
+                # Add render layer node
+                render_layer_node = nodes.new(type='CompositorNodeRLayers')
+                render_layer_node.location = (0, 0)
+
+                # Add image node
+                image_node = nodes.new(type='CompositorNodeImage')
+                image_node.location = (200, 200)
+                image_node.image = bpy.data.images.load(STOP_SIGN_TEXTURE_PATH)
+
+                # Add transform node (NEW: Controls scale/position)
+                transform_node = nodes.new(type='CompositorNodeTransform')
+                transform_node.location = (400, 200)
+                transform_node.inputs['Scale'].default_value = (0.2, 0.2)  # Reduce size (adjust as needed)
+                transform_node.inputs['Offset'].default_value = (0, 400)  # Move upward (adjust as needed)
+
+                # Add alpha over node
+                alpha_over_node = nodes.new(type='CompositorNodeAlphaOver')
+                alpha_over_node.location = (600, 0)
+
+                # Add composite output node
+                composite_node = nodes.new(type='CompositorNodeComposite')
+                composite_node.location = (800, 0)
+
+                # Link nodes (UPDATED: Insert transform node)
+                links.new(render_layer_node.outputs['Image'], alpha_over_node.inputs[1])
+                links.new(image_node.outputs['Image'], transform_node.inputs['Image'])  # Image → Transform
+                links.new(transform_node.outputs['Image'], alpha_over_node.inputs[2])  # Transform → Alpha Over
+                links.new(alpha_over_node.outputs['Image'], composite_node.inputs['Image'])
+
 
         # Render the scene and save the image
         bpy.ops.render.render(write_still=True)

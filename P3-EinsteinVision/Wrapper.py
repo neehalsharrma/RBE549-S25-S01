@@ -145,7 +145,7 @@ def process_video(
     os.makedirs(twinlite_dir, exist_ok=True)
 
     # Process each frame in the video
-    for frame_idx in tqdm(range(0, 100, 5)):
+    for frame_idx in tqdm(range(0, 1000, 10)):
         frame = get_frame(cap, frame_idx)
         if frame is None:
             continue
@@ -313,12 +313,12 @@ if __name__ == "__main__":
         description="Process video and generate 3D scene data."
     )
     parser.add_argument(
-        "--video_number", type=int, required=True, help="Video number to process."
+        "--video", type=int, required=True, help="Video number to process."
     )
     args = parser.parse_args()
 
     # Assign the video number to process
-    VIDEO_NUMBER = args.video_number
+    VIDEO_NUMBER = args.video
 
     # Assign the models to use
     USE_YOLO = True  # YOLO
