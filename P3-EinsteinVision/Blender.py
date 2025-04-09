@@ -19,6 +19,7 @@ import json
 import os
 import sys
 from typing import Tuple, List
+import argparse  # Add argparse for command-line arguments
 
 import bpy
 from pyffmpeg import FFmpeg  # Import pyffmpeg
@@ -53,6 +54,9 @@ WRAPPER_SCRIPT_PATH = "./Wrapper.py"
 RENDER_OUTPUT_BASE_DIR = "./Results/Renders"
 FFMPEG_OUTPUT_BASE_DIR = "./Results/FFMPEG"
 VIDEO_NUMBER = 1  # Set the video number for output organization
+
+# Add a global constant for the stop sign texture path
+STOP_SIGN_TEXTURE_PATH = "./Assets/StopSignImage.png"
 
 
 def spawn_objects(
@@ -96,38 +100,65 @@ def spawn_objects(
             new_obj.data = obj.data.copy()
             new_obj.animation_data_clear()  # Clear any animation data
             new_obj.location = location  # Set the object's location
-            if filepath in vehicle_filepaths.values():
-                new_obj.rotation_euler = rotation  # Set the object's rotation
-            else:
-                new_obj.rotation_euler = (
-                    rotation[0] + 1.57,
-                    rotation[1],
-                    rotation[2] - 1.57,
-                )  # Rotate x by 90 degrees
-            if filepath in vehicle_filepaths.values():
-                if "Truck.blend" in filepath:  # Check if the vehicle is a truck
-                    new_obj.scale = (0.000964, 0.000964, 0.000964)  # Scale for truck
-                else:
-                    new_obj.scale = (0.02, 0.02, 0.02)  # Scale for other vehicles
-            else:
-                new_obj.scale = (
-                    0.5,
-                    0.5,
-                    0.5,
-                )  # Scale the object to 0.5 if it's not a vehicle
+            new_obj.rotation_euler = rotation  # Set the object's rotation
+            new_obj.scale = (0.02, 0.02, 0.02)  # Uniform scale for all objects
             bpy.context.collection.objects.link(new_obj)  # Link the object to the scene
             spawned_objects.append(new_obj)
 
             # Process and link child objects
             for child_obj in obj.children:
-                new_child_obj = child_obj.copy()
-                new_child_obj.data = child_obj.data.copy()
-                new_child_obj.animation_data_clear()
-                new_child_obj.parent = new_obj  # Maintain parent-child relationship
-                bpy.context.collection.objects.link(new_child_obj)
-                spawned_objects.append(new_child_obj)
+            new_child_obj = child_obj.copy()
+            new_child_obj.data = child_obj.data.copy()
+            new_child_obj.animation_data_clear()
+            new_child_obj.parent = new_obj  # Maintain parent-child relationship
+            bpy.context.collection.objects.link(new_child_obj)
+            spawned_objects.append(new_child_obj)
 
     return spawned_objects
+
+
+def apply_texture_to_object(image_path, obj):
+    """
+    Apply a texture to a given Blender object using an image file.
+
+    This function creates a new material, enables nodes for the material,
+    and assigns an image texture to the material. The texture is then linked
+    to the Principled BSDF shader's Base Color input. Finally, the material
+    is assigned to the specified object.
+
+    Parameters
+    ----------
+    image_path : str
+        The file path to the image to be used as the texture.
+    obj : bpy.types.Object
+        The Blender object to which the texture will be applied.
+
+    Returns
+    -------
+    None
+    """
+    # Create a new material and enable the use of nodes
+    material = bpy.data.materials.new(name="ImageTexture")
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+
+    # Create an Image Texture node and load the image
+    tex_node = nodes.new("ShaderNodeTexImage")
+    tex_node.image = bpy.data.images.load(image_path)
+
+    # Get the Principled BSDF node and link the texture to its Base Color input
+    bsdf_node = nodes.get("Principled BSDF")
+    material.node_tree.links.new(
+        tex_node.outputs["Color"], bsdf_node.inputs["Base Color"]
+    )
+
+    # Assign the material to the object
+    if obj.data.materials:
+        # Replace the first material if the object already has materials
+        obj.data.materials[0] = material
+    else:
+        # Add the new material if the object has no materials
+        obj.data.materials.append(material)
 
 
 def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) -> None:
@@ -179,7 +210,12 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 blend_filepath = traffic_item_filepaths[obj["type"]]
             else:
                 continue
-            spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
+            spawned_objects = spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
+
+            # Apply stop sign texture if the object is a stop sign
+            if obj["type"] == "stop sign":
+                for spawned_obj in spawned_objects:
+                    apply_texture_to_object(STOP_SIGN_TEXTURE_PATH, spawned_obj)
 
         # Render the scene and save the image
         bpy.ops.render.render(write_still=True)
@@ -209,11 +245,19 @@ def main() -> None:
     -------
     None
     """
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Render 3D scenes in Blender.")
+    parser.add_argument(
+        "--video_number", type=int, required=True, help="Video number to process."
+    )
+    args = parser.parse_args()
+
+    # Assign the video number from the argument
+    VIDEO_NUMBER = args.video_number
+
     # Load the JSON file containing object details
     with open(SPAWN_JSON_PATH, "r") as file:
         data = json.load(file)
-
-    VIDEO_NUMBER = 8
 
     # Define the output directory for renders based on the video number
     render_output_dir = f"{RENDER_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}"

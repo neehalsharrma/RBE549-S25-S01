@@ -25,9 +25,10 @@ Functions
     Executes the Blender script to render 3D scenes.
 """
 
+import argparse
 import json
 import os
-import subprocess
+import ssl
 import sys
 
 import cv2
@@ -36,18 +37,16 @@ import numpy as np
 import torch
 from Networks.DataLoader import get_frame, load_video
 from Networks.MiDaS import load_ZoeDepth
-from Networks.ZoeDepth.zoedepth.utils.misc import colorize
 from Networks.TwinLiteNet import (
     load_TwinLiteNet,
-    show_seg_result,
     preprocess_img,
     process_output,
+    show_seg_result,
 )
 from Networks.YOLOv11 import load_model as load_yolo
-from tqdm import tqdm  # For progress bar
-
-import ssl
+from Networks.ZoeDepth.zoedepth.utils.misc import colorize
 from pyffmpeg import FFmpeg
+from tqdm import tqdm
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -309,18 +308,27 @@ def generate_video_from_frames(
 
 
 if __name__ == "__main__":
-    # Define the input video path and output JSON file path
-    video_path = "Data/Sequences"  # Adjust as needed
-    output_json = "./spawn.json"
-    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Process video and generate 3D scene data."
+    )
+    parser.add_argument(
+        "--video_number", type=int, required=True, help="Video number to process."
+    )
+    args = parser.parse_args()
 
     # Assign the video number to process
-    VIDEO_NUMBER = 8  # Change this value to process a different video
+    VIDEO_NUMBER = args.video_number
 
     # Assign the models to use
     USE_YOLO = True  # YOLO
     USE_MIDAS = True  # MiDaS
     USE_TWIN_LITE = True  # TwinLiteNet
+
+    # Define the input video path and output JSON file path
+    video_path = "Data/Sequences"  # Adjust as needed
+    output_json = "./spawn.json"
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Process the video and generate the JSON file
     process_video(video_path, output_json, device=dev)
