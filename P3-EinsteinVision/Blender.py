@@ -194,9 +194,9 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
     )
     os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
     ff = FFmpeg()
-    input_pattern = os.path.join(render_output_dir, "%06d.png")
+    input_pattern = os.path.join(render_output_dir, "*.png")
     ff.options(
-        f"-y -framerate 30 -i {input_pattern} -c:v libx264 -pix_fmt yuv420p {output_video_path}"
+        f"-y -framerate 30 -pattern_type glob -i {input_pattern} -c:v libx264 -r 30 -pix_fmt yuv420p {output_video_path}"
     )
     print(f"Blender render video saved at {output_video_path}")
 
@@ -213,7 +213,7 @@ def main() -> None:
     with open(SPAWN_JSON_PATH, "r") as file:
         data = json.load(file)
 
-    VIDEO_NUMBER = 7
+    VIDEO_NUMBER = 8
 
     # Define the output directory for renders based on the video number
     render_output_dir = f"{RENDER_OUTPUT_BASE_DIR}/vid_{VIDEO_NUMBER}"

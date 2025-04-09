@@ -146,7 +146,7 @@ def process_video(
     os.makedirs(twinlite_dir, exist_ok=True)
 
     # Process each frame in the video
-    for frame_idx in tqdm(range(num_frames)):
+    for frame_idx in tqdm(range(0, 100, 5)):
         frame = get_frame(cap, frame_idx)
         if frame is None:
             continue
@@ -295,22 +295,15 @@ def generate_video_from_frames(
     output_dir = os.path.dirname(output_video)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Determine the input pattern based on the type of frames
-    if "YOLO" in frames_dir:
-        input_pattern = os.path.join(frames_dir, "annotated_frame_%d.png")
-    elif "MiDaS" in frames_dir:
-        input_pattern = os.path.join(frames_dir, "depth_frame_%d.png")
-    elif "TwinLiteNet" in frames_dir:
-        input_pattern = os.path.join(frames_dir, "twinlite_frame_%d.png")
-    else:
-        raise ValueError("Unknown frame type in frames_dir")
+    # Define the input pattern for frame images
+    input_pattern = os.path.join(frames_dir, "*.png")
 
     # Initialize pyffmpeg
     ff = FFmpeg()
 
     # Use pyffmpeg to generate the video
     ff.options(
-        f"-y -framerate {fps} -i {input_pattern} -c:v libx264 -pix_fmt yuv420p {output_video}"
+        f"-y -framerate {fps} -pattern_type glob -i {input_pattern} -c:v libx264 -pix_fmt -r 30 yuv420p {output_video}"
     )
     print(f"Video generated at {output_video}")
 
@@ -322,7 +315,7 @@ if __name__ == "__main__":
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Assign the video number to process
-    VIDEO_NUMBER = 7  # Change this value to process a different video
+    VIDEO_NUMBER = 8  # Change this value to process a different video
 
     # Assign the models to use
     USE_YOLO = True  # YOLO
@@ -334,25 +327,25 @@ if __name__ == "__main__":
 
     # Generate video from YOLO-annotated frames
     if USE_YOLO:
-        yolo_frames_dir = f"./Results/YOLO/vid_{VIDEO_NUMBER}"
-        yolo_video_path = (
+        input_frames_dir = f"./Results/YOLO/vid_{VIDEO_NUMBER}"
+        output_video_path = (
             f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/yolo_annotated_video.mp4"
         )
-        generate_video_from_frames(yolo_frames_dir, yolo_video_path)
+        generate_video_from_frames(input_frames_dir, output_video_path)
 
     # Generate video from MiDaS depth outputs
     if USE_MIDAS:
-        midas_frames_dir = f"./Results/MiDaS/vid_{VIDEO_NUMBER}"
-        midas_video_path = f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/midas_depth_video.mp4"
-        generate_video_from_frames(midas_frames_dir, midas_video_path)
+        input_frames_dir = f"./Results/MiDaS/vid_{VIDEO_NUMBER}"
+        output_video_path = f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/midas_depth_video.mp4"
+        generate_video_from_frames(input_frames_dir, output_video_path)
 
     # Generate video from TwinLiteNet outputs
     if USE_TWIN_LITE:
-        twinlite_frames_dir = f"./Results/TwinLiteNet/vid_{VIDEO_NUMBER}"
-        twinlite_video_path = (
+        input_frames_dir = f"./Results/TwinLiteNet/vid_{VIDEO_NUMBER}"
+        output_video_path = (
             f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/twinlite_output_video.mp4"
         )
-        generate_video_from_frames(twinlite_frames_dir, twinlite_video_path)
+        generate_video_from_frames(input_frames_dir, output_video_path)
 
     # Run the Blender script to render 3D scenes
     print("Processing completed. Please run the Blender script to render 3D scenes.")
