@@ -46,6 +46,7 @@ traffic_item_filepaths = {
     "dustbin": "./Assets/Dustbin.blend",
     "traffic cone": "./Assets/TrafficCone.blend",
     "speed limit": "./Assets/SpeedLimitSign.blend",
+    "stop sign": "./Assets/StopSign.blend",
 }
 
 # Global constants
@@ -54,9 +55,6 @@ WRAPPER_SCRIPT_PATH = "./Wrapper.py"
 RENDER_OUTPUT_BASE_DIR = "./Results/Renders"
 FFMPEG_OUTPUT_BASE_DIR = "./Results/FFMPEG"
 VIDEO_NUMBER = 1  # Set the video number for output organization
-
-# Add a global constant for the stop sign texture path
-STOP_SIGN_TEXTURE_PATH = "./Assets/StopSignImage.png"
 
 
 def spawn_objects(
@@ -101,18 +99,17 @@ def spawn_objects(
             new_obj.animation_data_clear()  # Clear any animation data
             new_obj.location = location  # Set the object's location
             new_obj.rotation_euler = rotation  # Set the object's rotation
-            new_obj.scale = (0.02, 0.02, 0.02)  # Uniform scale for all objects
             bpy.context.collection.objects.link(new_obj)  # Link the object to the scene
             spawned_objects.append(new_obj)
 
             # Process and link child objects
             for child_obj in obj.children:
-            new_child_obj = child_obj.copy()
-            new_child_obj.data = child_obj.data.copy()
-            new_child_obj.animation_data_clear()
-            new_child_obj.parent = new_obj  # Maintain parent-child relationship
-            bpy.context.collection.objects.link(new_child_obj)
-            spawned_objects.append(new_child_obj)
+                new_child_obj = child_obj.copy()
+                new_child_obj.data = child_obj.data.copy()
+                new_child_obj.animation_data_clear()
+                new_child_obj.parent = new_obj  # Maintain parent-child relationship
+                bpy.context.collection.objects.link(new_child_obj)
+                spawned_objects.append(new_child_obj)
 
     return spawned_objects
 
@@ -210,10 +207,12 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 blend_filepath = traffic_item_filepaths[obj["type"]]
             else:
                 continue
-            spawned_objects = spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
+            spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
 
             # Check if a stop sign is detected in the current frame
-            stop_sign_detected = any(obj["type"] == "stop sign" for obj in frame_data["objects"])
+            stop_sign_detected = any(
+                obj["type"] == "stop sign" for obj in frame_data["objects"]
+            )
 
             if stop_sign_detected:
                 # Add image alert on screen if a stop sign is detected
@@ -227,34 +226,45 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                     nodes.remove(node)
 
                 # Add render layer node
-                render_layer_node = nodes.new(type='CompositorNodeRLayers')
+                render_layer_node = nodes.new(type="CompositorNodeRLayers")
                 render_layer_node.location = (0, 0)
 
                 # Add image node
-                image_node = nodes.new(type='CompositorNodeImage')
+                image_node = nodes.new(type="CompositorNodeImage")
                 image_node.location = (200, 200)
                 image_node.image = bpy.data.images.load(STOP_SIGN_TEXTURE_PATH)
 
                 # Add transform node (NEW: Controls scale/position)
-                transform_node = nodes.new(type='CompositorNodeTransform')
+                transform_node = nodes.new(type="CompositorNodeTransform")
                 transform_node.location = (400, 200)
-                transform_node.inputs['Scale'].default_value = (0.2, 0.2)  # Reduce size (adjust as needed)
-                transform_node.inputs['Offset'].default_value = (0, 400)  # Move upward (adjust as needed)
+                transform_node.inputs["Scale"].default_value = (
+                    0.2,
+                    0.2,
+                )  # Reduce size (adjust as needed)
+                transform_node.inputs["Offset"].default_value = (
+                    0,
+                    400,
+                )  # Move upward (adjust as needed)
 
                 # Add alpha over node
-                alpha_over_node = nodes.new(type='CompositorNodeAlphaOver')
+                alpha_over_node = nodes.new(type="CompositorNodeAlphaOver")
                 alpha_over_node.location = (600, 0)
 
                 # Add composite output node
-                composite_node = nodes.new(type='CompositorNodeComposite')
+                composite_node = nodes.new(type="CompositorNodeComposite")
                 composite_node.location = (800, 0)
 
                 # Link nodes (UPDATED: Insert transform node)
-                links.new(render_layer_node.outputs['Image'], alpha_over_node.inputs[1])
-                links.new(image_node.outputs['Image'], transform_node.inputs['Image'])  # Image → Transform
-                links.new(transform_node.outputs['Image'], alpha_over_node.inputs[2])  # Transform → Alpha Over
-                links.new(alpha_over_node.outputs['Image'], composite_node.inputs['Image'])
-
+                links.new(render_layer_node.outputs["Image"], alpha_over_node.inputs[1])
+                links.new(
+                    image_node.outputs["Image"], transform_node.inputs["Image"]
+                )  # Image → Transform
+                links.new(
+                    transform_node.outputs["Image"], alpha_over_node.inputs[2]
+                )  # Transform → Alpha Over
+                links.new(
+                    alpha_over_node.outputs["Image"], composite_node.inputs["Image"]
+                )
 
         # Render the scene and save the image
         bpy.ops.render.render(write_still=True)
@@ -287,12 +297,12 @@ def main() -> None:
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description="Render 3D scenes in Blender.")
     parser.add_argument(
-        "--video_number", type=int, required=True, help="Video number to process."
+        "--video", type=int, required=True, help="Video number to process."
     )
     args = parser.parse_args()
 
     # Assign the video number from the argument
-    VIDEO_NUMBER = args.video_number
+    VIDEO_NUMBER = args.video
 
     # Load the JSON file containing object details
     with open(SPAWN_JSON_PATH, "r") as file:
