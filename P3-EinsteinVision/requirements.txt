@@ -1,0 +1,13 @@
+numpy           # Fundamental package for numerical computations in Python
+scipy           # Scientific computing and technical computing library
+matplotlib      # Library for creating static, animated, and interactive visualizations
+pyffmpeg        # Library for reading and writing video files
+
+opencv-python   # OpenCV: Library for computer vision and image processing
+torch           # PyTorch: Deep learning framework
+torchvision     # PyTorch library for image processing tasks
+torchaudio      # PyTorch library for audio processing tasks
+kornia          # Computer vision library built on PyTorch
+
+ultralytics     # Library for YOLO (You Only Look Once) object detection models
+bpy             # Blender Python API for 3D modeling and rendering
