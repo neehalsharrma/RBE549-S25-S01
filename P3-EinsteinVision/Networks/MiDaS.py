@@ -55,3 +55,15 @@ def load_ZoeDepth() -> torch.nn.Module:
     model_zoe.train_midas = False
     model_zoe.eval()
     return model_zoe
+
+
+def get_depth_from_prediction(pred):
+    if isinstance(pred, torch.Tensor):
+        pred = pred  # pass
+    elif isinstance(pred, (list, tuple)):
+        pred = pred[-1]
+    elif isinstance(pred, dict):
+        pred = pred['metric_depth'] if 'metric_depth' in pred else pred['out']
+    else:
+        raise NotImplementedError(f"Unknown output type {type(pred)}")
+    return pred
