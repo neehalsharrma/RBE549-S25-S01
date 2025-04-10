@@ -31,7 +31,7 @@ def load_video(
     Parameters
     ----------
     video_path : str, optional
-        The base directory where video sequences are stored (default is './Data/Sequences').
+        The base directory where video sequences are stored (default is './Data/Sequences/').
     video_num : int, optional
         The scene number of the video to load (default is 1).
     cam_type : str, optional
@@ -70,7 +70,7 @@ def load_video(
 
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    
+
     return cap, num_frames, h, w
 
 

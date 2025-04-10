@@ -15,11 +15,27 @@ load_ZoeDepth()
 
 import torch
 import sys
-
+import matplotlib.pyplot
 import numpy as np
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
+
+
+def refresh_MiDaS():
+    """
+    Refresh the MiDaS repository.
+
+    This function forces a fresh download of the MiDaS repository and its associated
+    model weights.
+
+    Returns
+    -------
+    None
+    """
+    # Trigger a fresh download of the MiDaS repository
+    torch.hub.help("intel-isl/MiDaS", "DPT_BEiT_L_384", force_reload=True)
+
 
 def load_ZoeDepth() -> torch.nn.Module:
     """
