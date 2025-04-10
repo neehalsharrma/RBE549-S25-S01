@@ -42,7 +42,7 @@ import matplotlib
 from Networks.DataLoader import get_frame, load_video, load_calibration_matrix
 # from Networks.car_keypoints import get_carpoint_predictor
 
-from Networks.CarSeg import load_carseg
+
 from Networks.YOLOv11 import load_model as load_yolo
 from tqdm import tqdm  # For progress bar
 
@@ -88,25 +88,30 @@ def process_video(video_path: str, video_num: int, output_json: str,
     results_dir = "./Testing"
     jsons_dir = os.path.join(results_dir, "jsons")
     yolo_dir = os.path.join(results_dir, f"YOLO/vid_{video_num}")
-
+    yolo_dir_frames = os.path.join(results_dir, f"YOLO/vid_{video_num}/frames")
 
     os.makedirs(yolo_dir, exist_ok=True)
-
+    os.makedirs(yolo_dir_frames, exist_ok=True)
     os.makedirs(jsons_dir, exist_ok=True)
 
     # Process each frame in the video
-    for frame_idx in tqdm(range(0, 30, 5)):
+    for frame_idx in tqdm(range(0, num_frames, 5)):
         frame = get_frame(cap, frame_idx)
         if frame is None:
             continue
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        # frame = torch.from_numpy(frame).permute(2, 0, 1).float().
         # YOLOv11 object detection
         detections = yolo_model.predict(frame, verbose=False)
-        os.makedirs(os.path.join(yolo_dir, f"frame_{frame_idx}"), exist_ok=True)
+        if len(detections) == 0:
+            continue
+
+
         yolo_frame = frame.copy()
         for i, det in enumerate(detections[0].boxes):
-            if yolo_model.names[int(det.cls)] !='car':
+            if yolo_model.names[int(det.cls)] !='traffic light':
                 continue
+
             bbox = det.xyxy.cpu().numpy()  # Bounding box coordinates
             bbox.astype(float)
             # Draw bounding boxes on the frame
@@ -120,11 +125,12 @@ def process_video(video_path: str, video_num: int, output_json: str,
             )
             sub_img = frame[int(y1):int(y2), int(x1):int(x2)]
             # Save the cropped image
+            os.makedirs(os.path.join(yolo_dir, f"frame_{frame_idx}"), exist_ok=True)
             cv2.imwrite(os.path.join(yolo_dir,f'frame_{frame_idx}', f"crop_{i}.png"), sub_img)
 
 
         # Save YOLO-annotated frame
-        cv2.imwrite(os.path.join(yolo_dir, f"annotated_frame_{frame_idx}.png"), yolo_frame)
+        cv2.imwrite(os.path.join(yolo_dir, f"frames/annotated_frame_{frame_idx}.png"), yolo_frame)
 
 
 
@@ -136,7 +142,7 @@ if __name__ == "__main__":
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Process the video and generate the JSON file
-    process_video(video_path, 3, output_json, device=dev)
+    process_video(video_path, 10, output_json, device=dev)
 
     # Run the Blender script
     # run_blender()

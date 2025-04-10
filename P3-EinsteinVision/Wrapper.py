@@ -33,8 +33,6 @@ import os
 import subprocess
 import sys
 sys.path.append('Networks/TwinLiteNetPlus')
-sys.path.append('Networks/openpifpaf/src/')
-
 import cv2
 import numpy as np
 import torch
