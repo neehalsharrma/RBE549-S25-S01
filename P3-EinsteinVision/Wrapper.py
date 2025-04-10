@@ -52,6 +52,7 @@ from Networks.TwinLiteNet import (
     process_output,
     show_seg_result,
 )
+from Networks.ZoeDepth.zoedepth.utils.misc import colorize
 from Networks.YOLOv11 import load_model as load_yolo
 
 from pyffmpeg import FFmpeg
@@ -123,7 +124,7 @@ def process_video(
 
     # Load the video and get the total number of frames
     video = VIDEO_NUMBER  # Use the global constant
-    cap, num_frames = load_video(video_path=video_path, video_num=video)
+    cap, num_frames, h, w = load_video(video_path=video_path, video_num=video)
     print(f"Loaded video with {num_frames} frames.")
 
     # Load the models
@@ -150,9 +151,9 @@ def process_video(
     # Create directories for saving outputs of each model
     results_dir = "./Results"
     jsons_dir = os.path.join(results_dir, "jsons")
-    yolo_dir = os.path.join(results_dir, f"YOLO/vid_{video_num}")
-    depth_dir = os.path.join(results_dir, f"DepthPro/vid_{video_num}")
-    twinlite_dir_base = os.path.join(results_dir, f"TwinLiteNet/vid_{video_num}")
+    yolo_dir = os.path.join(results_dir, f"YOLO/vid_{VIDEO_NUMBER}")
+    depth_dir = os.path.join(results_dir, f"DepthPro/vid_{VIDEO_NUMBER}")
+    twinlite_dir_base = os.path.join(results_dir, f"TwinLiteNet/vid_{VIDEO_NUMBER}")
     twinlite_dir_imgs = os.path.join(twinlite_dir_base, 'imgs')
     twinlite_dir_masks = os.path.join(twinlite_dir_base, 'masks')
 
@@ -291,7 +292,7 @@ def process_video(
             spawn_data, json_file, indent=4, default=float
         )  # Ensure serialization
     print(f"Saved spawn data to {output_json}")
-    shutil.copy(output_json, os.path.join(results_dir, 'jsons', f"vid_{video_num}.json"))
+    shutil.copy(output_json, os.path.join(results_dir, 'jsons', f"vid_{VIDEO_NUMBER}.json"))
 
 def generate_video_from_frames(
     frames_dir: str, output_video: str, fps: int = 30
@@ -335,12 +336,12 @@ if __name__ == "__main__":
         description="Process video and generate 3D scene data."
     )
     parser.add_argument(
-        "--video", type=int, required=True, help="Video number to process."
+        "--video",  type=int, required=True, help="Video number to process."
     )
     args = parser.parse_args()
 
     # Assign the video number to process
-    VIDEO_NUMBER = args.video
+    VIDEO_NUMBER =  # args.video
 
     # Assign the models to use
     USE_YOLO = True  # YOLO
@@ -351,7 +352,7 @@ if __name__ == "__main__":
     video_path = "Data/Sequences"  # Adjust as needed
     output_json = "./spawn.json"
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    dev = 'cpu'
     # Process the video and generate the JSON file
     process_video(video_path, output_json, device=dev)
 

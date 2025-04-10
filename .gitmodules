@@ -15,3 +15,6 @@
 [submodule "P3-EinsteinVision/Networks/openpifpaf"]
 	path = P3-EinsteinVision/Networks/openpifpaf
 	url = git@github.com:openpifpaf/openpifpaf.git
+[submodule "P3-EinsteinVision/Networks/ZoeDepth"]
+	path = P3-EinsteinVision/Networks/ZoeDepth
+	url = git@github.com:isl-org/ZoeDepth.git
