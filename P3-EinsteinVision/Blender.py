@@ -18,8 +18,10 @@ Dependencies:
 import json
 import os
 import sys
-from typing import Tuple, List
 import argparse
+from math import degrees
+from typing import List, Tuple
+import glob
 
 import bpy
 from pyffmpeg import FFmpeg
@@ -30,13 +32,13 @@ sys.dont_write_bytecode = True
 # Dictionary to store absolute filepaths for different vehicle types
 # These filepaths point to .blend files containing 3D models of vehicles
 vehicle_filepaths = {
-    "car": "./Assets/Vehicles/Car.blend",
-    "truck": "./Assets/Vehicles/Truck.blend",
-    "suv": "./Assets/Vehicles/SUV.blend",
-    "motorcycle": "./Assets/Vehicles/Motorcycle.blend",
-    "bus": "./Assets/Vehicles/Bus.blend",
-    "bicycle": "./Assets/Vehicles/Bicycle.blend",
-    "pickup truck": "./Assets/Vehicles/PickupTruck.blend",
+    "Car": "./Assets/Vehicles/Car.blend",
+    "Van": "./Assets/Vehicles/Truck.blend",
+    "Suv": "./Assets/Vehicles/SUV.blend",
+    "Motorcycle": "./Assets/Vehicles/Motorcycle.blend",
+    "Bus": "./Assets/Vehicles/Bus.blend",
+    "Bicycle": "./Assets/Vehicles/Bicycle.blend",
+    "Pickup truck": "./Assets/Vehicles/PickupTruck.blend",
 }
 
 # Dictionary to store absolute filepaths for different traffic items
@@ -88,7 +90,7 @@ def spawn_objects(
     list of bpy.types.Object
         A list of the spawned objects, including both top-level objects and their children.
     """
-    # Load objects from the specified .blend file, excluding the camera
+    # Load objects from the specified .blend file
     with bpy.data.libraries.load(filepath) as (data_from, data_to):
         data_to.objects = [
             obj for obj in data_from.objects if obj not in {"Camera", "Sun"}
@@ -113,7 +115,7 @@ def spawn_objects(
                 new_child_obj = child_obj.copy()
                 new_child_obj.data = child_obj.data.copy()
                 new_child_obj.animation_data_clear()
-                new_child_obj.parent = new_obj  # Maintain parent-child relationship
+                new_child_obj.parent = new_obj
                 bpy.context.collection.objects.link(new_child_obj)
                 spawned_objects.append(new_child_obj)
 
@@ -214,6 +216,37 @@ def setup_compositing_nodes():
     links.new(alpha_over2.outputs[0], composite.inputs[0])
 
 
+def add_pedestrians_to_scene(frame_number: int):
+    """
+    Search for pedestrian .obj files corresponding to the given frame number
+    and add them to the Blender scene with specified transformations.
+
+    Parameters
+    ----------
+    frame_number : int
+        The frame number to search for corresponding pedestrian files.
+
+    Returns
+    -------
+    None
+    """
+    pedestrians_folder = "./Assets/Pedestrians/"
+    frame_pattern = f"{pedestrians_folder}*_{frame_number}.obj"
+    pedestrian_files = glob.glob(frame_pattern)
+
+    for pedestrian_file in pedestrian_files:
+        # Import the pedestrian .obj file into the Blender scene
+        bpy.ops.import_scene.obj(filepath=pedestrian_file)
+
+        # Apply transformations to the imported pedestrian objects
+        for obj in bpy.context.selected_objects:
+            obj.location.x += 1.5
+            obj.location.y += 1.5
+            obj.location.z += 1.5
+            obj.rotation_euler.y += 3.14159  # 180 degrees in radians
+            obj.rotation_euler.z += 3.14159  # 180 degrees in radians
+
+
 def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) -> None:
     """
     Render the Blender scene based on the provided data and save the output images.
@@ -238,7 +271,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 bpy.data.objects.remove(obj, do_unlink=True)
 
         # Spawn a car object at the origin with a specific rotation
-        spawn_objects(vehicle_filepaths["car"], (0, 0, 0), (0, 0, 3.14))
+        spawn_objects(vehicle_filepaths["Car"], (0, 0, 0), (0, 0, 3.14))
 
         # Add a Sun light source to the scene
         sun = bpy.data.lights.new(name="Sun", type="SUN")
@@ -257,11 +290,11 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
 
         # Extract object details for the current frame
         for obj in frame_data["objects"]:
-            x, y, z = obj["position"]["x"], obj["position"]["y"], obj["position"]["z"]
+            x, y, z = obj["position"]["x"], obj["position"]["z"], obj["position"]["y"]
             phi, theta, psi = (
-                obj["rotation"]["x"],
-                obj["rotation"]["y"],
-                obj["rotation"]["z"],
+                degrees(obj["rotation"]["x"]),
+                degrees(obj["rotation"]["y:"]),
+                degrees(obj["rotation"]["z"]),
             )
 
             if obj["type"] in vehicle_filepaths:
@@ -271,6 +304,9 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
             else:
                 continue
             spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
+
+        # Add pedestrians to the scene for the current frame
+        add_pedestrians_to_scene(frame_data["frame"])
 
         # Set up compositing nodes for rendering
         setup_compositing_nodes()

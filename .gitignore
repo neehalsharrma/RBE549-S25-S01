@@ -1,9 +1,10 @@
 # User-generated data files
-*.vscode
+.vscode
 *:Zone.Identifier
 Data/
 Results/
 *.pt
+*.blend1
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

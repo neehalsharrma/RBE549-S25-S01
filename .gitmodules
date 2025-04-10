@@ -9,3 +9,6 @@
 [submodule "P3-EinsteinVision/Networks/ZoeDepth"]
 	path = P3-EinsteinVision/Networks/ZoeDepth
 	url = https://github.com/isl-org/ZoeDepth.git
+[submodule "P3-EinsteinVision/Networks/multi-hmr"]
+	path = P3-EinsteinVision/Networks/multi-hmr
+	url = https://github.com/naver/multi-hmr.git

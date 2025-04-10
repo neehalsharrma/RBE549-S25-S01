@@ -18,6 +18,7 @@ Dependencies:
 import json
 import os
 import sys
+from math import degrees
 from typing import List, Tuple
 
 import bpy
@@ -28,13 +29,13 @@ sys.dont_write_bytecode = True
 # Dictionary to store absolute filepaths for different vehicle types
 # These filepaths point to .blend files containing 3D models of vehicles
 vehicle_filepaths = {
-    "car": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Car.blend",
-    "truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Truck.blend",
-    "suv": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/SUV.blend",
-    "motorcycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Motorcycle.blend",
-    "bus": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bus.blend",
-    "bicycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bicycle.blend",
-    "pickup truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/PickupTruck.blend",
+    "Car": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Car.blend",
+    "Van": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Truck.blend",
+    "Suv": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/SUV.blend",
+    "Motorcycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Motorcycle.blend",
+    "Bus": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bus.blend",
+    "Bicycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bicycle.blend",
+    "Pickup truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/PickupTruck.blend",
 }
 
 # Dictionary to store absolute filepaths for different traffic items
@@ -48,7 +49,7 @@ traffic_item_filepaths = {
 }
 
 # Global constants
-SPAWN_JSON_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/spawn.json"
+SPAWN_JSON_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/results.json"
 WRAPPER_SCRIPT_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Wrapper.py"
 RENDER_OUTPUT_BASE_DIR = (
     "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders"
@@ -234,7 +235,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 bpy.data.objects.remove(obj, do_unlink=True)
 
         # Spawn a car object at the origin with a specific rotation
-        spawn_objects(vehicle_filepaths["car"], (0, 0, 0), (0, 0, 3.14))
+        spawn_objects(vehicle_filepaths["Car"], (0, 0, 0), (0, 0, 3.14))
 
         # Add a Sun light source to the scene
         sun = bpy.data.lights.new(name="Sun", type="SUN")
@@ -253,11 +254,15 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
 
         # Extract object details for the current frame
         for obj in frame_data["objects"]:
-            x, y, z = obj["position"]["x"], obj["position"]["y"], obj["position"]["z"]
+            x, y, z = (
+                obj["position"]["x"],
+                obj["position"]["z"],
+                obj["position"]["y"],
+            )
             phi, theta, psi = (
-                obj["rotation"]["x"],
-                obj["rotation"]["y"],
-                obj["rotation"]["z"],
+                degrees(obj["rotation"]["x"]),
+                degrees(obj["rotation"]["y:"]),
+                degrees(obj["rotation"]["z"]),
             )
 
             if obj["type"] in vehicle_filepaths:
@@ -311,30 +316,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         bpy.data.images["Render Result"].save_render(image_filepath)
         print(f"Rendered image {image_name}")
 
-        # Reset compositing and image overlays for the next render
-        scene = bpy.context.scene
-        scene.use_nodes = True
-        nodes = scene.node_tree.nodes
-        links = scene.node_tree.links
-
-        # # Clear all newly added nodes in the compositor
-        # for node in list(nodes):
-        #     if node.name not in {"Render Layers", "Composite"}:
-        #         nodes.remove(node)
-
-        # # Ensure the remaining nodes are linked together
-        # render_layer_node = nodes.get("Render Layers")
-        # composite_node = nodes.get("Composite")
-        # if render_layer_node and composite_node:
-        #     # Clear existing links
-        #     for link in list(links):
-        #         links.remove(link)
-        #     # Link Render Layers to Composite
-        #     links.new(
-        #         render_layer_node.outputs["Image"], composite_node.inputs["Image"]
-        #     )
-
-        if frame_data["frame"] == 5:
+        if frame_data["frame"] == 55:
             break
 
 
