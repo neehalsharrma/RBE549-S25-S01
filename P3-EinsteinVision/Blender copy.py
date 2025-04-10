@@ -54,6 +54,7 @@ RENDER_OUTPUT_BASE_DIR = (
     "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders"
 )
 STOP_SIGN_TEXTURE_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/StopSignImage.png"  # Path to stop sign texture
+SPEED_LIMIT_TEXTURE_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/SpeedLimitSignImage.png"  # Path to speed limit texture
 
 
 def spawn_objects(
@@ -115,48 +116,98 @@ def spawn_objects(
     return spawned_objects
 
 
-def apply_texture_to_object(image_path, obj):
+def setup_compositing_nodes():
     """
-    Apply a texture to a given Blender object using an image file.
-
-    This function creates a new material, enables nodes for the material,
-    and assigns an image texture to the material. The texture is then linked
-    to the Principled BSDF shader's Base Color input. Finally, the material
-    is assigned to the specified object.
-
-    Parameters
-    ----------
-    image_path : str
-        The file path to the image to be used as the texture.
-    obj : bpy.types.Object
-        The Blender object to which the texture will be applied.
+    Sets up compositing nodes in Blender to overlay stop sign and speed limit images
+    on the rendered frames.
 
     Returns
     -------
     None
     """
-    # Create a new material and enable the use of nodes
-    material = bpy.data.materials.new(name="ImageTexture")
-    material.use_nodes = True
-    nodes = material.node_tree.nodes
+    # Enable compositing and clear existing nodes
+    bpy.context.scene.use_nodes = True
+    tree = bpy.context.scene.node_tree
+    for node in tree.nodes:
+        tree.nodes.remove(node)
 
-    # Create an Image Texture node and load the image
-    tex_node = nodes.new("ShaderNodeTexImage")
-    tex_node.image = bpy.data.images.load(image_path)
+    # Create render layers node
+    render_layers = tree.nodes.new(type="CompositorNodeRLayers")
+    render_layers.location = (0, 0)
 
-    # Get the Principled BSDF node and link the texture to its Base Color input
-    bsdf_node = nodes.get("Principled BSDF")
-    material.node_tree.links.new(
-        tex_node.outputs["Color"], bsdf_node.inputs["Base Color"]
-    )
+    # Create image nodes
+    stop_sign = tree.nodes.new(type="CompositorNodeImage")
+    stop_sign.location = (0, 200)
+    stop_sign.name = "StopSignImage"
+    # To load your image:
+    stop_sign.image = bpy.data.images.load(STOP_SIGN_TEXTURE_PATH)
 
-    # Assign the material to the object
-    if obj.data.materials:
-        # Replace the first material if the object already has materials
-        obj.data.materials[0] = material
-    else:
-        # Add the new material if the object has no materials
-        obj.data.materials.append(material)
+    speed_limit = tree.nodes.new(type="CompositorNodeImage")
+    speed_limit.location = (0, -200)
+    speed_limit.name = "SpeedLimitSign"
+    # To load your image:
+    speed_limit.image = bpy.data.images.load(SPEED_LIMIT_TEXTURE_PATH)
+
+    # Create transform nodes
+    transform1 = tree.nodes.new(type="CompositorNodeTransform")
+    transform1.location = (300, 200)
+    transform1.inputs["X"].default_value = 0.0
+    transform1.inputs["Y"].default_value = 350.0
+    transform1.inputs["Angle"].default_value = 0.0
+    transform1.inputs["Scale"].default_value = 0.200
+    transform1.filter_type = "NEAREST"
+
+    transform2 = tree.nodes.new(type="CompositorNodeTransform")
+    transform2.location = (300, -200)
+    transform2.inputs["X"].default_value = 270.0
+    transform2.inputs["Y"].default_value = 350.0
+    transform2.inputs["Angle"].default_value = 0.0
+    transform2.inputs["Scale"].default_value = 0.090
+    transform2.filter_type = "NEAREST"
+
+    # Create Alpha Over nodes
+    alpha_over1 = tree.nodes.new(type="CompositorNodeAlphaOver")
+    alpha_over1.name = "AlphaOver_StopSign"
+    alpha_over1.location = (600, 100)
+    alpha_over1.use_premultiply = True
+    alpha_over1.premul = 0.0
+    alpha_over1.inputs[0].default_value = 0.1  # Fac value
+
+    alpha_over2 = tree.nodes.new(type="CompositorNodeAlphaOver")
+    alpha_over2.name = "AlphaOver_SpeedLimit"
+    alpha_over2.location = (900, 0)
+    alpha_over2.use_premultiply = True
+    alpha_over2.premul = 0.0
+    alpha_over2.inputs[0].default_value = 0.1  # Fac value
+
+    # Create Composite output node
+    composite = tree.nodes.new(type="CompositorNodeComposite")
+    composite.location = (1200, 0)
+    composite.use_alpha = True
+
+    # Connect nodes
+    links = tree.links
+
+    # Connect stop sign image to transform1
+    links.new(stop_sign.outputs["Image"], transform1.inputs[0])
+
+    # Connect speed limit image to transform2
+    links.new(speed_limit.outputs["Image"], transform2.inputs[0])
+
+    # Connect render layers to first alpha over
+    links.new(render_layers.outputs["Image"], alpha_over1.inputs[1])
+
+    # Connect transform1 output to first alpha over
+    links.new(transform1.outputs[0], alpha_over1.inputs[2])
+
+    # Connect first alpha over to second alpha over
+    links.new(alpha_over1.outputs[0], alpha_over2.inputs[1])
+
+    # Connect transform2 output to second alpha over
+    links.new(transform2.outputs[0], alpha_over2.inputs[2])
+
+    # Connect final result to composite output
+    links.new(alpha_over2.outputs[0], composite.inputs[0])
 
 
 def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) -> None:
@@ -202,7 +253,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
 
         # Extract object details for the current frame
         for obj in frame_data["objects"]:
-            x, y, z = obj["position"]["x"], obj["position"]["y"], 0
+            x, y, z = obj["position"]["x"], obj["position"]["y"], obj["position"]["z"]
             phi, theta, psi = (
                 obj["rotation"]["x"],
                 obj["rotation"]["y"],
@@ -217,104 +268,41 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 continue
             spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
 
+        # Set up compositing nodes for rendering
+        setup_compositing_nodes()
+
         # Check if a stop sign is detected in the current frame
         stop_sign_detected = any(
             obj["type"] == "stop sign" for obj in frame_data["objects"]
         )
-
-        if stop_sign_detected:
-            # Add image alert on screen if a stop sign is detected
-            # Enable compositing
-            bpy.context.scene.use_nodes = True
-            nodes = bpy.context.scene.node_tree.nodes
-            links = bpy.context.scene.node_tree.links
-
-            # Clear existing nodes
-            for node in nodes:
-                nodes.remove(node)
-
-            # Add render layer node
-            render_layer_node = nodes.new(type="CompositorNodeRLayers")
-            render_layer_node.location = (0, 0)
-
-            # Add image node
-            image_node = nodes.new(type="CompositorNodeImage")
-            image_node.location = (200, 200)
-            image_node.image = bpy.data.images.load(STOP_SIGN_TEXTURE_PATH)
-
-            # Add transform node (NEW: Controls scale/position)
-            transform_node = nodes.new(type="CompositorNodeTransform")
-            transform_node.location = (400, 200)
-            transform_node.inputs["Scale"].default_value = 0.2
-            transform_node.inputs["Y"].default_value = 400
-
-            # Add alpha over node
-            alpha_over_node = nodes.new(type="CompositorNodeAlphaOver")
-            alpha_over_node.location = (600, 0)
-
-            # Add composite output node
-            composite_node = nodes.new(type="CompositorNodeComposite")
-            composite_node.location = (800, 0)
-
-            # Link nodes
-            links.new(render_layer_node.outputs["Image"], alpha_over_node.inputs[1])
-            links.new(
-                image_node.outputs["Image"], transform_node.inputs["Image"]
-            )  # Image → Transform
-            links.new(
-                transform_node.outputs["Image"], alpha_over_node.inputs[2]
-            )  # Transform → Alpha Over
-            links.new(alpha_over_node.outputs["Image"], composite_node.inputs["Image"])
 
         # Check if a speed limit sign is detected in the current frame
         speed_limit_detected = any(
             obj["type"] == "speed limit" for obj in frame_data["objects"]
         )
 
+        # Set the visibility of the stop sign and speed limit sign based on detection
+        if stop_sign_detected:
+            # Set the stop sign texture to be visible
+            for node in bpy.context.scene.node_tree.nodes:
+                if node.name == "AlphaOver_StopSign":
+                    node.inputs[0].default_value = 1.0
+        else:
+            # Hide the stop sign texture
+            for node in bpy.context.scene.node_tree.nodes:
+                if node.name == "AlphaOver_StopSign":
+                    node.inputs[0].default_value = 0.1
+
         if speed_limit_detected:
-            # Add image alert on screen if a speed limit sign is detected
-            # Enable compositing
-            bpy.context.scene.use_nodes = True
-            nodes = bpy.context.scene.node_tree.nodes
-            links = bpy.context.scene.node_tree.links
-
-            # Clear existing nodes
-            for node in nodes:
-                nodes.remove(node)
-
-            # Add render layer node
-            render_layer_node = nodes.new(type="CompositorNodeRLayers")
-            render_layer_node.location = (0, 0)
-
-            # Add image node
-            image_node = nodes.new(type="CompositorNodeImage")
-            image_node.location = (200, 200)
-            image_node.image = bpy.data.images.load(SPEED_LIMIT_TEXTURE_PATH)
-
-            # Add transform node (NEW: Controls scale/position)
-            transform_node = nodes.new(type="CompositorNodeTransform")
-            transform_node.location = (400, 200)
-            transform_node.inputs["Scale"].default_value = 0.2
-            transform_node.inputs["X"].default_value = 100
-            transform_node.inputs["Y"].default_value = 400
-
-            # Add alpha over node
-            alpha_over_node = nodes.new(type="CompositorNodeAlphaOver")
-            alpha_over_node.location = (600, 0)
-
-            # Add composite output node
-            composite_node = nodes.new(type="CompositorNodeComposite")
-            composite_node.location = (800, 0)
-
-            # Link nodes
-            links.new(render_layer_node.outputs["Image"], alpha_over_node.inputs[1])
-            links.new(
-                image_node.outputs["Image"], transform_node.inputs["Image"]
-            )  # Image → Transform
-            links.new(
-                transform_node.outputs["Image"], alpha_over_node.inputs[2]
-            )  # Transform → Alpha Over
-            links.new(alpha_over_node.outputs["Image"], composite_node.inputs["Image"])
+            # Set the speed limit texture to be visible
+            for node in bpy.context.scene.node_tree.nodes:
+                if node.name == "AlphaOver_SpeedLimit":
+                    node.inputs[0].default_value = 1.0
+        else:
+            # Hide the speed limit texture
+            for node in bpy.context.scene.node_tree.nodes:
+                if node.name == "AlphaOver_SpeedLimit":
+                    node.inputs[0].default_value = 0.1
 
         # Render the scene and save the image
         bpy.ops.render.render(write_still=True)
@@ -329,24 +317,24 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         nodes = scene.node_tree.nodes
         links = scene.node_tree.links
 
-        # Clear all newly added nodes in the compositor
-        for node in list(nodes):
-            if node.name not in {"Render Layers", "Composite"}:
-                nodes.remove(node)
+        # # Clear all newly added nodes in the compositor
+        # for node in list(nodes):
+        #     if node.name not in {"Render Layers", "Composite"}:
+        #         nodes.remove(node)
 
-        # Ensure the remaining nodes are linked together
-        render_layer_node = nodes.get("Render Layers")
-        composite_node = nodes.get("Composite")
-        if render_layer_node and composite_node:
-            # Clear existing links
-            for link in list(links):
-                links.remove(link)
-            # Link Render Layers to Composite
-            links.new(
-                render_layer_node.outputs["Image"], composite_node.inputs["Image"]
-            )
+        # # Ensure the remaining nodes are linked together
+        # render_layer_node = nodes.get("Render Layers")
+        # composite_node = nodes.get("Composite")
+        # if render_layer_node and composite_node:
+        #     # Clear existing links
+        #     for link in list(links):
+        #         links.remove(link)
+        #     # Link Render Layers to Composite
+        #     links.new(
+        #         render_layer_node.outputs["Image"], composite_node.inputs["Image"]
+        #     )
 
-        if frame_data["frame"] == 10:
+        if frame_data["frame"] == 5:
             break
 
 
