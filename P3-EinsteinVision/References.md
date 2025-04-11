@@ -11,8 +11,20 @@
    - Description: Used for depth estimation in video frames. Combines relative and metric depth.
 
 3. **TwinLiteNetPlus**  
-   - Source: [TwinLiteNetPlus GitHub Repository](https://github.com/your-repo/TwinLiteNetPlus)  
+   - Source: [TwinLiteNetPlus GitHub Repository](https://github.com/chequanghuy/TwinLiteNetPlus)  
    - Description: Used for additional frame processing tasks like semantic segmentation.
+
+4. **OpenPifPaf**  
+   - Source: [OpenPifPaf GitHub Repository](https://github.com/openpifpaf/openpifpaf)  
+   - Description: Used for semantic keypoint detection and spatio-temporal association.
+
+5. **Multi-HMR**  
+   - Source: [Multi-HMR GitHub Repository](https://github.com/naver/multi-hmr)  
+   - Description: Used for multi-person whole-body human mesh recovery.
+
+6. **Depth Pro**  
+   - Source: [Depth Pro GitHub Repository](https://github.com/apple/ml-depth-pro)  
+   - Description: Used for sharp monocular metric depth estimation.
 
 ## Packages Used
 
@@ -56,26 +68,14 @@
     - Source: [Torchvision GitHub Repository](https://github.com/pytorch/vision)  
     - Description: Provides utilities for image transformations and datasets.
 
-11. **Argparse**  
-    - Source: [Python Argparse Documentation](https://docs.python.org/3/library/argparse.html)  
-    - Description: Used for parsing command-line arguments.
-
-12. **Requests**  
-    - Source: [Requests GitHub Repository](https://github.com/psf/requests)  
-    - Description: Used for fetching images from URLs.
-
-13. **H5py**  
-    - Source: [H5py GitHub Repository](https://github.com/h5py/h5py)  
-    - Description: Used for handling HDF5 files.
-
-14. **SciPy**  
-    - Source: [SciPy Official Website](https://scipy.org/)  
-    - Description: Used for scientific computations.
-
-15. **Timm**  
+11. **Timm**  
     - Source: [Timm GitHub Repository](https://github.com/rwightman/pytorch-image-models)  
     - Description: Provides pre-trained models and utilities for vision tasks.
 
-16. **PyFFmpeg**  
+12. **DINOv2**  
+    - Source: [DINOv2 GitHub Repository](https://github.com/facebookresearch/dinov2)  
+    - Description: Used for robust visual feature extraction.
+
+13. **PyFFmpeg**  
     - Source: [PyFFmpeg GitHub Repository](https://github.com/pyffmpeg/pyffmpeg)  
     - Description: Used for generating videos from annotated frames and rendered images.
