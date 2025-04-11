@@ -20,6 +20,7 @@ import os
 import sys
 from math import degrees
 from typing import List, Tuple
+import glob
 
 import bpy
 
@@ -29,13 +30,13 @@ sys.dont_write_bytecode = True
 # Dictionary to store absolute filepaths for different vehicle types
 # These filepaths point to .blend files containing 3D models of vehicles
 vehicle_filepaths = {
-    "Car": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Car.blend",
-    "Van": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Truck.blend",
-    "Suv": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/SUV.blend",
-    "Motorcycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Motorcycle.blend",
-    "Bus": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bus.blend",
-    "Bicycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bicycle.blend",
-    "Pickup truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/PickupTruck.blend",
+    "car": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Car.blend",
+    "van": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Truck.blend",
+    "suv": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/SUV.blend",
+    "motorcycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Motorcycle.blend",
+    "bus": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bus.blend",
+    "bicycle": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/Bicycle.blend",
+    "pickup truck": "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Vehicles/PickupTruck.blend",
 }
 
 # Dictionary to store absolute filepaths for different traffic items
@@ -49,7 +50,7 @@ traffic_item_filepaths = {
 }
 
 # Global constants
-SPAWN_JSON_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/results.json"
+SPAWN_JSON_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/spawn.json"
 WRAPPER_SCRIPT_PATH = "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Wrapper.py"
 RENDER_OUTPUT_BASE_DIR = (
     "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Results/Renders"
@@ -211,6 +212,39 @@ def setup_compositing_nodes():
     links.new(alpha_over2.outputs[0], composite.inputs[0])
 
 
+def add_pedestrians_to_scene(frame_number: int):
+    """
+    Search for pedestrian .obj files corresponding to the given frame number
+    and add them to the Blender scene with specified transformations.
+
+    Parameters
+    ----------
+    frame_number : int
+        The frame number to search for corresponding pedestrian files.
+
+    Returns
+    -------
+    None
+    """
+    pedestrians_folder = (
+        "/home/nasharrma/RBE549-S25-S01/P3-EinsteinVision/Assets/Pedestrians/"
+    )
+    frame_pattern = f"{pedestrians_folder}frame_{frame_number}_human_*.obj"
+    pedestrian_files = glob.glob(frame_pattern)
+
+    for pedestrian_file in pedestrian_files:
+        # Import the pedestrian object
+        bpy.ops.wm.obj_import(filepath=pedestrian_file)
+
+        # Apply transformations to the imported pedestrian objects
+        for obj in bpy.context.selected_objects:
+            obj.location.x += 1.5
+            obj.location.y += 1.5
+            obj.location.z += 1.5
+            obj.rotation_euler.y += 3.14159  # 180 degrees in radians
+            obj.rotation_euler.z += 3.14159  # 180 degrees in radians
+
+
 def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) -> None:
     """
     Render the Blender scene based on the provided data and save the output images.
@@ -235,7 +269,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 bpy.data.objects.remove(obj, do_unlink=True)
 
         # Spawn a car object at the origin with a specific rotation
-        spawn_objects(vehicle_filepaths["Car"], (0, 0, 0), (0, 0, 3.14))
+        spawn_objects(vehicle_filepaths["car"], (0, 0, 0), (0, 0, 3.14))
 
         # Add a Sun light source to the scene
         sun = bpy.data.lights.new(name="Sun", type="SUN")
@@ -254,14 +288,10 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
 
         # Extract object details for the current frame
         for obj in frame_data["objects"]:
-            x, y, z = (
-                obj["position"]["x"],
-                obj["position"]["z"],
-                obj["position"]["y"],
-            )
+            x, y, z = (obj["position"]["x"] - 9) * 1.2, obj["position"]["y"] / 1.5, 0
             phi, theta, psi = (
                 degrees(obj["rotation"]["x"]),
-                degrees(obj["rotation"]["y:"]),
+                degrees(obj["rotation"]["y"]),
                 degrees(obj["rotation"]["z"]),
             )
 
@@ -272,6 +302,9 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
             else:
                 continue
             spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
+
+        # Add pedestrians to the scene for the current frame
+        add_pedestrians_to_scene(frame_data["frame"])
 
         # Set up compositing nodes for rendering
         setup_compositing_nodes()
@@ -316,7 +349,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         bpy.data.images["Render Result"].save_render(image_filepath)
         print(f"Rendered image {image_name}")
 
-        if frame_data["frame"] == 55:
+        if frame_data["frame"] == 1370:
             break
 
 
@@ -329,7 +362,7 @@ def main() -> None:
     None
     """
     # Assign the video number from the argument
-    VIDEO_NUMBER = 8
+    VIDEO_NUMBER = 11
 
     # Load the JSON file containing object details
     with open(SPAWN_JSON_PATH, "r") as file:

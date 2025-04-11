@@ -32,13 +32,13 @@ sys.dont_write_bytecode = True
 # Dictionary to store absolute filepaths for different vehicle types
 # These filepaths point to .blend files containing 3D models of vehicles
 vehicle_filepaths = {
-    "Car": "./Assets/Vehicles/Car.blend",
-    "Van": "./Assets/Vehicles/Truck.blend",
-    "Suv": "./Assets/Vehicles/SUV.blend",
-    "Motorcycle": "./Assets/Vehicles/Motorcycle.blend",
-    "Bus": "./Assets/Vehicles/Bus.blend",
-    "Bicycle": "./Assets/Vehicles/Bicycle.blend",
-    "Pickup truck": "./Assets/Vehicles/PickupTruck.blend",
+    "car": "./Assets/Vehicles/Car.blend",
+    "van": "./Assets/Vehicles/Truck.blend",
+    "suv": "./Assets/Vehicles/SUV.blend",
+    "motorcycle": "./Assets/Vehicles/Motorcycle.blend",
+    "bus": "./Assets/Vehicles/Bus.blend",
+    "bicycle": "./Assets/Vehicles/Bicycle.blend",
+    "pickup truck": "./Assets/Vehicles/PickupTruck.blend",
 }
 
 # Dictionary to store absolute filepaths for different traffic items
@@ -231,12 +231,12 @@ def add_pedestrians_to_scene(frame_number: int):
     None
     """
     pedestrians_folder = "./Assets/Pedestrians/"
-    frame_pattern = f"{pedestrians_folder}*_{frame_number}.obj"
+    frame_pattern = f"{pedestrians_folder}frame_{frame_number}_human_*.obj"
     pedestrian_files = glob.glob(frame_pattern)
 
     for pedestrian_file in pedestrian_files:
-        # Import the pedestrian .obj file into the Blender scene
-        bpy.ops.import_scene.obj(filepath=pedestrian_file)
+        # Import the pedestrian object
+        bpy.ops.wm.import_scene.obj(filepath=pedestrian_file)
 
         # Apply transformations to the imported pedestrian objects
         for obj in bpy.context.selected_objects:
@@ -271,7 +271,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
                 bpy.data.objects.remove(obj, do_unlink=True)
 
         # Spawn a car object at the origin with a specific rotation
-        spawn_objects(vehicle_filepaths["Car"], (0, 0, 0), (0, 0, 3.14))
+        spawn_objects(vehicle_filepaths["car"], (0, 0, 0), (0, 0, 3.14))
 
         # Add a Sun light source to the scene
         sun = bpy.data.lights.new(name="Sun", type="SUN")
@@ -290,10 +290,10 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
 
         # Extract object details for the current frame
         for obj in frame_data["objects"]:
-            x, y, z = obj["position"]["x"], obj["position"]["z"], obj["position"]["y"]
+            x, y, z = (obj["position"]["x"] - 9) * 1.2, obj["position"]["y"] / 1.5, 0
             phi, theta, psi = (
                 degrees(obj["rotation"]["x"]),
-                degrees(obj["rotation"]["y:"]),
+                degrees(obj["rotation"]["y"]),
                 degrees(obj["rotation"]["z"]),
             )
 
@@ -351,7 +351,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         bpy.data.images["Render Result"].save_render(image_filepath)
         print(f"Rendered image {image_name}")
 
-        if frame_data["frame"] == 10:
+        if frame_data["frame"] == 1370:
             break
 
     # Generate a video from the rendered images using pyffmpeg
