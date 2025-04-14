@@ -28,27 +28,28 @@ Functions
 import json
 from json import encoder
 
+import matplotlib.pyplot as plt
+
 encoder.FLOAT_REPR = lambda o: format(o, '.2f')
 import os
 import subprocess
 import sys
+
 sys.path.append('Networks/openpifpaf')
 sys.path.append('Networks/TwinLiteNetPlus')
-
+from Networks.YOLO_Models import load_lane_detector
 import cv2
 import numpy as np
 import torch
 import matplotlib
 from Networks.DataLoader import get_frame, load_video, load_calibration_matrix
-# from Networks.car_keypoints import get_carpoint_predictor
+from Networks.OpticalFlow import get_optical_flow, visualize
 
-
-from Networks.YOLOv11 import load_model as load_yolo
+from Networks.YOLO_Models import load_yoloe as load_yolo
 from tqdm import tqdm  # For progress bar
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
-
 
 
 def process_video(video_path: str, video_num: int, output_json: str,
@@ -77,9 +78,8 @@ def process_video(video_path: str, video_num: int, output_json: str,
     print(f"Loaded video with {num_frames} frames.")
 
     # Load the models
-    yolo_model = load_yolo()
-
-
+    yolo_model = load_yolo().cpu()
+    # lane_detector = load_lane_detector().to(device=device)
 
     # Initialize the JSON data structure
     spawn_data = []
@@ -89,10 +89,17 @@ def process_video(video_path: str, video_num: int, output_json: str,
     jsons_dir = os.path.join(results_dir, "jsons")
     yolo_dir = os.path.join(results_dir, f"YOLO/vid_{video_num}")
     yolo_dir_frames = os.path.join(results_dir, f"YOLO/vid_{video_num}/frames")
-
+    lanes_dir = os.path.join(results_dir, f"Lanes/vid_{video_num}")
+    flow_dir = os.path.join(results_dir, f"Flow/vid_{video_num}")
+    os.makedirs(os.path.join(flow_dir, 'imgs'), exist_ok=True)
+    os.makedirs(os.path.join(flow_dir, 'numpy'), exist_ok=True)
+    os.makedirs(flow_dir, exist_ok=True)
+    os.makedirs(lanes_dir, exist_ok=True)
     os.makedirs(yolo_dir, exist_ok=True)
     os.makedirs(yolo_dir_frames, exist_ok=True)
     os.makedirs(jsons_dir, exist_ok=True)
+
+    last_frame = None
 
     # Process each frame in the video
     for frame_idx in tqdm(range(0, num_frames, 5)):
@@ -106,10 +113,68 @@ def process_video(video_path: str, video_num: int, output_json: str,
         if len(detections) == 0:
             continue
 
+        if last_frame is not None:
+            # Optical flow calculation
+            flow = get_optical_flow(last_frame, frame)
+            np.save(os.path.join(flow_dir, f"numpy/flow_{frame_idx}.npy"), flow)
+            # Visualize the flow
+            flow_rgb = visualize(flow)
+            cv2.imwrite(os.path.join(flow_dir, f"imgs/flow_{frame_idx}.png"), flow_rgb)
+
+        last_frame = frame
+        continue
+
+        # lanes = lane_detector.predict(frame, verbose=False)
+        # if len(lanes) == 0:
+        #     continue
+        # # Process the detected lanes
+        # lane_data = []
+        # lane_frame = frame.copy()
+        # for lane in lanes[0]:
+        #
+        #     lane_mask = lane.masks.data.cpu().numpy().squeeze()
+        #     lane_mask = np.array(lane_mask, dtype=np.uint8)
+        #     lane_mask = cv2.resize(lane_mask, (w, h), interpolation=cv2.INTER_NEAREST)
+        #     lane_seg = lane.masks.cpu().xy[0]
+        #     lane_mask = np.stack([lane_mask*100, lane_mask*0, lane_mask*0], axis=-1)
+        #     # plot on the original image
+        #
+        #     area = cv2.contourArea(lane_seg)
+        #     if area < 200:
+        #         continue
+        #
+        #     lane_frame = cv2.add(lane_frame, lane_mask)
+        #     quad = np.polynomial.polynomial.polyfit(lane_seg[:,0], lane_seg[:,1], 3)
+        #
+        #     x_min, y_min = lane_seg[:,0].min(), lane_seg[:,1].min()
+        #     x_max, y_max = lane_seg[:,0].max(), lane_seg[:,1].max()
+        #     x_space = (x_max - x_min) / 10
+        #
+        #     points = []
+        #     for i in range(10):
+        #         x = x_min + i * x_space
+        #         y = quad[0] + quad[1] * x + quad[2] * x**2 + quad[3] * x**3
+        #         points.append((x, y))
+        #
+        #     # Draw the lane points on the frame
+        #     for point in points:
+        #         cv2.circle(lane_frame, (int(point[0]), int(point[1])), 5, (0, 0, 255), -1)
+
+        # bbox = lane.boxes.xyxy.cpu().numpy()
+        # # Draw bounding boxes on the frame
+        # cv2.rectangle(
+        #     lane_frame,
+        #     (int(bbox[0][0]), int(bbox[0][1])),
+        #     (int(bbox[0][2]), int(bbox[0][3])),
+        #     (0, 255, 0),
+        #     2,
+        # )
+        # cv2.imwrite(os.path.join(lanes_dir, f"lane_{frame_idx}.png"), lane_frame)
 
         yolo_frame = frame.copy()
+
         for i, det in enumerate(detections[0].boxes):
-            if yolo_model.names[int(det.cls)] !='traffic light':
+            if yolo_model.names[int(det.cls)] != 'car':
                 continue
 
             bbox = det.xyxy.cpu().numpy()  # Bounding box coordinates
@@ -126,23 +191,20 @@ def process_video(video_path: str, video_num: int, output_json: str,
             sub_img = frame[int(y1):int(y2), int(x1):int(x2)]
             # Save the cropped image
             os.makedirs(os.path.join(yolo_dir, f"frame_{frame_idx}"), exist_ok=True)
-            cv2.imwrite(os.path.join(yolo_dir,f'frame_{frame_idx}', f"crop_{i}.png"), sub_img)
-
+            cv2.imwrite(os.path.join(yolo_dir, f'frame_{frame_idx}', f"crop_{i}.png"), sub_img)
 
         # Save YOLO-annotated frame
         cv2.imwrite(os.path.join(yolo_dir, f"frames/annotated_frame_{frame_idx}.png"), yolo_frame)
 
 
-
-
 if __name__ == "__main__":
     # Define the input video path and output JSON file path
-    video_path = "Data/Sequences"  # Adjust as needed
+    video_path = "./Data/Sequences"  # Adjust as needed
     output_json = "./spawn.json"
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Process the video and generate the JSON file
-    process_video(video_path, 10, output_json, device=dev)
+    process_video(video_path, 3, output_json, device=dev)
 
     # Run the Blender script
     # run_blender()

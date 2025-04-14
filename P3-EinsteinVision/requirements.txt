@@ -11,3 +11,4 @@ kornia          # Computer vision library built on PyTorch
 
 ultralytics     # Library for YOLO (You Only Look Once) object detection models
 bpy             # Blender Python API for 3D modeling and rendering
+transformers    # Hugging Face Transformers library

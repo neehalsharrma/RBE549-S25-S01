@@ -18,8 +18,10 @@ Dependencies:
 import json
 import os
 import sys
-from typing import Tuple, List
 import argparse
+from math import degrees
+from typing import List, Tuple
+import glob
 
 import bpy
 from pyffmpeg import FFmpeg
@@ -31,7 +33,7 @@ sys.dont_write_bytecode = True
 # These filepaths point to .blend files containing 3D models of vehicles
 vehicle_filepaths = {
     "car": "./Assets/Vehicles/Car.blend",
-    "truck": "./Assets/Vehicles/Truck.blend",
+    "van": "./Assets/Vehicles/Truck.blend",
     "suv": "./Assets/Vehicles/SUV.blend",
     "motorcycle": "./Assets/Vehicles/Motorcycle.blend",
     "bus": "./Assets/Vehicles/Bus.blend",
@@ -88,7 +90,7 @@ def spawn_objects(
     list of bpy.types.Object
         A list of the spawned objects, including both top-level objects and their children.
     """
-    # Load objects from the specified .blend file, excluding the camera
+    # Load objects from the specified .blend file
     with bpy.data.libraries.load(filepath) as (data_from, data_to):
         data_to.objects = [
             obj for obj in data_from.objects if obj not in {"Camera", "Sun"}
@@ -113,7 +115,7 @@ def spawn_objects(
                 new_child_obj = child_obj.copy()
                 new_child_obj.data = child_obj.data.copy()
                 new_child_obj.animation_data_clear()
-                new_child_obj.parent = new_obj  # Maintain parent-child relationship
+                new_child_obj.parent = new_obj
                 bpy.context.collection.objects.link(new_child_obj)
                 spawned_objects.append(new_child_obj)
 
@@ -214,6 +216,37 @@ def setup_compositing_nodes():
     links.new(alpha_over2.outputs[0], composite.inputs[0])
 
 
+def add_pedestrians_to_scene(frame_number: int):
+    """
+    Search for pedestrian .obj files corresponding to the given frame number
+    and add them to the Blender scene with specified transformations.
+
+    Parameters
+    ----------
+    frame_number : int
+        The frame number to search for corresponding pedestrian files.
+
+    Returns
+    -------
+    None
+    """
+    pedestrians_folder = "./Assets/Pedestrians/"
+    frame_pattern = f"{pedestrians_folder}frame_{frame_number}_human_*.obj"
+    pedestrian_files = glob.glob(frame_pattern)
+
+    for pedestrian_file in pedestrian_files:
+        # Import the pedestrian object
+        bpy.ops.wm.import_scene.obj(filepath=pedestrian_file)
+
+        # Apply transformations to the imported pedestrian objects
+        for obj in bpy.context.selected_objects:
+            obj.location.x += 1.5
+            obj.location.y += 1.5
+            obj.location.z += 1.5
+            obj.rotation_euler.y += 3.14159  # 180 degrees in radians
+            obj.rotation_euler.z += 3.14159  # 180 degrees in radians
+
+
 def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) -> None:
     """
     Render the Blender scene based on the provided data and save the output images.
@@ -257,11 +290,11 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
 
         # Extract object details for the current frame
         for obj in frame_data["objects"]:
-            x, y, z = obj["position"]["x"], obj["position"]["y"], obj["position"]["z"]
+            x, y, z = (obj["position"]["x"] - 9) * 1.2, obj["position"]["y"] / 1.5, 0
             phi, theta, psi = (
-                obj["rotation"]["x"],
-                obj["rotation"]["y"],
-                obj["rotation"]["z"],
+                degrees(obj["rotation"]["x"]),
+                degrees(obj["rotation"]["y"]),
+                degrees(obj["rotation"]["z"]),
             )
 
             if obj["type"] in vehicle_filepaths:
@@ -271,6 +304,9 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
             else:
                 continue
             spawn_objects(blend_filepath, (x, y, z), (phi, theta, psi))
+
+        # Add pedestrians to the scene for the current frame
+        add_pedestrians_to_scene(frame_data["frame"])
 
         # Set up compositing nodes for rendering
         setup_compositing_nodes()
@@ -315,7 +351,7 @@ def render_scene(data: List[dict], render_output_dir: str, VIDEO_NUMBER: int) ->
         bpy.data.images["Render Result"].save_render(image_filepath)
         print(f"Rendered image {image_name}")
 
-        if frame_data["frame"] == 10:
+        if frame_data["frame"] == 1370:
             break
 
     # Generate a video from the rendered images using pyffmpeg

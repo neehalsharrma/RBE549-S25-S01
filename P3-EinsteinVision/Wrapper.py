@@ -27,24 +27,20 @@ Functions
 
 import argparse
 import json
-import shutil
-from json import encoder
-
-encoder.FLOAT_REPR = lambda o: format(o, '.2f')
 import os
+import shutil
 import ssl
 import sys
-sys.path.append('Networks/TwinLiteNetPlus')
+from json import encoder
+from xmlrpc.client import Boolean
+
 import cv2
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import matplotlib
-from Networks.DataLoader import get_frame, load_video, load_calibration_matrix
+from Networks.DataLoader import get_frame, load_calibration_matrix, load_video
 from Networks.DepthModel import load_depthmodel
-
-from Networks.TwinLiteNet import load_TwinLiteNet, show_seg_result, preprocess_img, process_output
-from Networks.DataLoader import get_frame, load_video
 from Networks.MiDaS import load_ZoeDepth
 from Networks.TwinLiteNet import (
     load_TwinLiteNet,
@@ -52,24 +48,25 @@ from Networks.TwinLiteNet import (
     process_output,
     show_seg_result,
 )
-from Networks.ZoeDepth.zoedepth.utils.misc import colorize
 from Networks.YOLO_Models import load_yoloe as load_yolo
-
+from Networks.ZoeDepth.zoedepth.utils.misc import colorize
 from pyffmpeg import FFmpeg
 from tqdm import tqdm
 
+sys.path.append("Networks/TwinLiteNetPlus")
 ssl._create_default_https_context = ssl._create_unverified_context
+encoder.FLOAT_REPR = lambda o: format(o, ".2f")
 
 # Disable the creation of __pycache__ directories
 sys.dont_write_bytecode = True
 
-# Define global constants for model usage
-USE_YOLO = True
-USE_MIDAS = True
+# Define global constants for model usage (set in main)
+USE_YOLO = False
+USE_MIDAS = False
 USE_TWIN_LITE = False
 
-# Define the video number as a global constant
-VIDEO_NUMBER = 5
+# Define the video number as a global constant (set in main)
+VIDEO_NUMBER = 0
 
 
 def load_calibration_matrix(data_path: str = "./Data/Calib/") -> np.ndarray:
@@ -146,7 +143,7 @@ def process_video(
     # Initialize the JSON data structure
     spawn_data = []
 
-    cmap = matplotlib.colormaps.get_cmap('viridis')
+    cmap = matplotlib.colormaps.get_cmap("viridis")
 
     # Create directories for saving outputs of each model
     results_dir = "./Results"
@@ -154,8 +151,8 @@ def process_video(
     yolo_dir = os.path.join(results_dir, f"YOLO/vid_{VIDEO_NUMBER}")
     depth_dir = os.path.join(results_dir, f"DepthPro/vid_{VIDEO_NUMBER}")
     twinlite_dir_base = os.path.join(results_dir, f"TwinLiteNet/vid_{VIDEO_NUMBER}")
-    twinlite_dir_imgs = os.path.join(twinlite_dir_base, 'imgs')
-    twinlite_dir_masks = os.path.join(twinlite_dir_base, 'masks')
+    twinlite_dir_imgs = os.path.join(twinlite_dir_base, "imgs")
+    twinlite_dir_masks = os.path.join(twinlite_dir_base, "masks")
 
     os.makedirs(yolo_dir, exist_ok=True)
     os.makedirs(depth_dir, exist_ok=True)
@@ -164,7 +161,7 @@ def process_video(
     os.makedirs(jsons_dir, exist_ok=True)
 
     # Process each frame in the video
-    for frame_idx in tqdm(range(0, num_frames, 5)):
+    for frame_idx in tqdm(range(1360, 1550, 5)):
         frame = get_frame(cap, frame_idx)
         if frame is None:
             continue
@@ -265,7 +262,9 @@ def process_video(
 
             twinlite_output = twinlite_model(img)
 
-            da_seg_mask, ll_seg_mask = process_output(twinlite_output, pad_h, pad_w, height, width, ratio)
+            da_seg_mask, ll_seg_mask = process_output(
+                twinlite_output, pad_h, pad_w, height, width, ratio
+            )
             da_seg_mask, ll_seg_mask = process_output(
                 twinlite_output, pad_h, pad_w, height, width, ratio
             )
@@ -292,7 +291,10 @@ def process_video(
             spawn_data, json_file, indent=4, default=float
         )  # Ensure serialization
     print(f"Saved spawn data to {output_json}")
-    shutil.copy(output_json, os.path.join(results_dir, 'jsons', f"vid_{VIDEO_NUMBER}.json"))
+    shutil.copy(
+        output_json, os.path.join(results_dir, "jsons", f"vid_{VIDEO_NUMBER}.json")
+    )
+
 
 def generate_video_from_frames(
     frames_dir: str, output_video: str, fps: int = 30
@@ -325,7 +327,7 @@ def generate_video_from_frames(
 
     # Use pyffmpeg to generate the video
     ff.options(
-        f"-y -framerate {fps} -pattern_type glob -i {input_pattern} -c:v libx264 -pix_fmt -r 30 yuv420p {output_video}"
+        f"-y -framerate {fps} -pattern_type glob -i {input_pattern} -c:v libx264 -pix_fmt yuv420p {output_video}"
     )
     print(f"Video generated at {output_video}")
 
@@ -336,23 +338,23 @@ if __name__ == "__main__":
         description="Process video and generate 3D scene data."
     )
     parser.add_argument(
-        "--video",  type=int, required=True, help="Video number to process."
+        "--video", type=int, required=True, help="Video number to process."
     )
     args = parser.parse_args()
 
     # Assign the video number to process
-    VIDEO_NUMBER = args.video # args.video
+    VIDEO_NUMBER = args.video  # args.video
 
     # Assign the models to use
     USE_YOLO = True  # YOLO
     USE_MIDAS = True  # MiDaS
-    USE_TWIN_LITE = True  # TwinLiteNet
+    USE_TWIN_LITE = False  # TwinLiteNet
 
     # Define the input video path and output JSON file path
-    video_path = "Data/Sequences"  # Adjust as needed
+    video_path = "./Data/Sequences"  # Adjust as needed
     output_json = "./spawn.json"
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dev = 'cpu'
+    dev = "cpu"
     # Process the video and generate the JSON file
     process_video(video_path, output_json, device=dev)
 
@@ -362,13 +364,13 @@ if __name__ == "__main__":
         output_video_path = (
             f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/yolo_annotated_video.mp4"
         )
-        generate_video_from_frames(input_frames_dir, output_video_path)
+        generate_video_from_frames(input_frames_dir, output_video_path, 4)
 
     # Generate video from MiDaS depth outputs
     if USE_MIDAS:
         input_frames_dir = f"./Results/MiDaS/vid_{VIDEO_NUMBER}"
         output_video_path = f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/midas_depth_video.mp4"
-        generate_video_from_frames(input_frames_dir, output_video_path)
+        generate_video_from_frames(input_frames_dir, output_video_path, 4)
 
     # Generate video from TwinLiteNet outputs
     if USE_TWIN_LITE:
@@ -376,7 +378,7 @@ if __name__ == "__main__":
         output_video_path = (
             f"./Results/FFMPEG/vid_{VIDEO_NUMBER}/twinlite_output_video.mp4"
         )
-        generate_video_from_frames(input_frames_dir, output_video_path)
+        generate_video_from_frames(input_frames_dir, output_video_path, 4)
 
     # Run the Blender script to render 3D scenes
     print("Processing completed. Please run the Blender script to render 3D scenes.")
