@@ -113,16 +113,16 @@ def process_video(video_path: str, video_num: int, output_json: str,
         if len(detections) == 0:
             continue
 
-        if last_frame is not None:
-            # Optical flow calculation
-            flow = get_optical_flow(last_frame, frame)
-            np.save(os.path.join(flow_dir, f"numpy/flow_{frame_idx}.npy"), flow)
-            # Visualize the flow
-            flow_rgb = visualize(flow)
-            cv2.imwrite(os.path.join(flow_dir, f"imgs/flow_{frame_idx}.png"), flow_rgb)
-
-        last_frame = frame
-        continue
+        # if last_frame is not None:
+        #     # Optical flow calculation
+        #     flow = get_optical_flow(last_frame, frame)
+        #     np.save(os.path.join(flow_dir, f"numpy/flow_{frame_idx}.npy"), flow)
+        #     # Visualize the flow
+        #     flow_rgb = visualize(flow)
+        #     cv2.imwrite(os.path.join(flow_dir, f"imgs/flow_{frame_idx}.png"), flow_rgb)
+        #
+        # last_frame = frame
+        # continue
 
         # lanes = lane_detector.predict(frame, verbose=False)
         # if len(lanes) == 0:
@@ -188,6 +188,7 @@ def process_video(video_path: str, video_num: int, output_json: str,
                 (0, 255, 0),
                 2,
             )
+
             sub_img = frame[int(y1):int(y2), int(x1):int(x2)]
             # Save the cropped image
             os.makedirs(os.path.join(yolo_dir, f"frame_{frame_idx}"), exist_ok=True)
@@ -204,7 +205,7 @@ if __name__ == "__main__":
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Process the video and generate the JSON file
-    process_video(video_path, 3, output_json, device=dev)
+    process_video(video_path, 9, output_json, device=dev)
 
     # Run the Blender script
     # run_blender()

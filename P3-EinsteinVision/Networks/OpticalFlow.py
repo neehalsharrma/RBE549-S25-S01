@@ -54,7 +54,7 @@ def get_optical_flow(image1, image2):
 
 
 
-def visualize(flow: np.array):
+def visualize(flow: np.array, sz: tuple[int, int] = (1280, 960)) -> np.array:
     # Create an RGB representation of the flow to show it on the screen
     # flow is a numpy array with shape (H, W, 2)
     flow_rgb: np.array = flow_utils.flow_to_rgb(flow)
@@ -62,6 +62,7 @@ def visualize(flow: np.array):
     # flow_rgb = np.permute_dims(flow_rgb, (1, 2, 0))
         # OpenCV uses BGR format
     flow_bgr_npy = cv2.cvtColor(flow_rgb, cv2.COLOR_RGB2BGR)
+    flow_bgr_npy = cv2.resize(flow_bgr_npy, sz, fx=0.5, fy=0.5)
 
     return flow_bgr_npy
 
