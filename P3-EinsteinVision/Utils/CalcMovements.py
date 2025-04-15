@@ -34,20 +34,15 @@ def approximate_average_flow(flow: np.array, movings: list[np.array]) -> np.arra
     Calculate the approximate global flow of the scene. I.e. the average
     flow of the scene without any objects that may be moving
     :param flow: the optical flow between two images in the shape of (H, W, 2)
-    :param depth1: the depth map of image 1 in the shape of (H, W)
-    :param depth2: the depth map of image 2 in the shape of (H, W)
     :param movings: the list of movable objects in the scene (cars, trucks, etc.)
     :return: the average flow of the scene in the shape of (2,)
     """
     #Convert the depth map to cartesian coordinates
-
     flow_scaled = _spacial_scale_flow(flow)
     for mask in movings:
         flow_scaled[mask] = 0
     mean_flow_xy = np.mean(flow_scaled, axis=(0, 1))
-
     return mean_flow_xy
-
 
 def predict_parked_objects(flow: np.array, depth1: np.array, depth2: np.array, boxes: np.array, thresh: float = 5) -> list[np.array]:
     """
@@ -67,12 +62,10 @@ def predict_parked_objects(flow: np.array, depth1: np.array, depth2: np.array, b
     # Convert the depth map to cartesian coordinates
     # Get the average flow of the scene
     avg_flow = approximate_average_flow(flow, boxes)
-
+    x1, y1, x2, y2 = boxes[0], boxes[1], boxes[2], boxes[3]
     classifications = dict()
     for i, box in enumerate(boxes):
-        box = box.astype(int)
-        x1, y1, x2, y2 = box[0], box[1], box[2], box[3]
-
+        curr_box = box.astype(int)
         # Get the flow for the box
         curr_flow = flow[y1:y2, x1:x2]
         mean_flow = np.mean(curr_flow, axis=(0, 1))
@@ -98,16 +91,33 @@ def predict_parked_objects(flow: np.array, depth1: np.array, depth2: np.array, b
 ############################################################################################################
 
 
+
+############################################################################################################
+######################## This was Nikesh messing around and it kinda maybe could work#######################
+############################################################################################################
+
+
 def calc_movement(img1:np.array, img2:np.array, boxes:np.array, flow:np.array, fundamental: np.array):
     """
-    Calculate the movement of the objects in the scene. This is done by
-    :param img1:
-    :param img2:
-    :param boxes:
-    :param flow:
-    :param fundamental:
-    :return:
+    Convert depth and uv coordinates to cartesian coordinates.
+    K is the camera intrinsic matrix.
+    depth is the depth map.
+    uv is the uv coordinates.
+    Returns the cartesian coordinates in the form of (x, y, z) and the distance to the object.
     """
+    bx1, by1, bx2, by2 = boxes[0], boxes[1], boxes[2], boxes[3]
+    flow_mask = flow[by1:by2, bx1:bx2]
+
+    corners = cv2.goodFeaturesToTrack(img1[by1:by2, bx1:bx2], maxCorners=100, qualityLevel=0.01, minDistance=10)
+    if corners is None:
+        return False
+    points = np.int32(corners).reshape(-1, 2)
+    h, w = img1.shape[:2]
+    distances = []
+    for point in points:
+        x, y = point[0], point[1]
+        # Get the flow for the point
+        predicted_flow = flow_mask[y, x]
     bx1, by1, bx2, by2 = boxes[0], boxes[1], boxes[2], boxes[3]
     flow_mask = flow[by1:by2, bx1:bx2]
 
@@ -152,7 +162,6 @@ def calc_movement(img1:np.array, img2:np.array, boxes:np.array, flow:np.array, f
         # True if moving
         # False if not moving
         return avg_sampson_distance < threshold
-
 
 
 
