@@ -52,6 +52,8 @@ def get_optical_flow(image1, image2):
 
     return flow
 
+
+
 def visualize(flow: np.array):
     # Create an RGB representation of the flow to show it on the screen
     # flow is a numpy array with shape (H, W, 2)
