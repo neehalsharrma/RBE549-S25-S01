@@ -18,3 +18,6 @@
 [submodule "P3-EinsteinVision/Networks/multi-hmr"]
 	path = P3-EinsteinVision/Networks/multi-hmr
 	url = https://github.com/naver/multi-hmr.git
+[submodule "P4-VIO/Pangolin"]
+	path = P4-VIO/Pangolin
+	url = https://github.com/stevenlovegrove/Pangolin.git
