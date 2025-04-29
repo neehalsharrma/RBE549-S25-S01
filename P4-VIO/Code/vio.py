@@ -1,11 +1,9 @@
-
 from queue import Queue
 from threading import Thread
 
 from config import ConfigEuRoC
 from image import ImageProcessor
 from msckf import MSCKF
-
 
 
 class VIO(object):
@@ -63,7 +61,6 @@ class VIO(object):
 
             if result is not None and self.viewer is not None:
                 self.viewer.update_pose(result.cam0_pose)
-        
 
 
 if __name__ == '__main__':
@@ -87,7 +84,6 @@ if __name__ == '__main__':
     dataset = EuRoCDataset(args.path)
     dataset.set_starttime(offset=40.)   # start from static state
 
-
     img_queue = Queue()
     imu_queue = Queue()
     # gt_queue = Queue()
@@ -95,11 +91,9 @@ if __name__ == '__main__':
     config = ConfigEuRoC()
     msckf_vio = VIO(config, img_queue, imu_queue, viewer=viewer)
 
-
     duration = float('inf')
-    ratio = 0.4  # make it smaller if image processing and MSCKF computation is slow
-    imu_publisher = DataPublisher(
-        dataset.imu, imu_queue, duration, ratio)
+    ratio = 0.3  # make it smaller if image processing and MSCKF computation is slow
+    imu_publisher = DataPublisher(dataset.imu, imu_queue, duration, ratio)
     img_publisher = DataPublisher(
         dataset.stereo, img_queue, duration, ratio)
 

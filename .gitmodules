@@ -21,3 +21,6 @@
 [submodule "P4-VIO/Pangolin"]
 	path = P4-VIO/Pangolin
 	url = https://github.com/stevenlovegrove/Pangolin.git
+[submodule "P4-VIO/pangolin"]
+	path = P4-VIO/pangolin
+	url = https://github.com/uoip/pangolin.git

@@ -6,7 +6,6 @@ import cv2
 from multiprocessing import Queue, Process
 
 
-
 class Viewer(object):
     def __init__(self):
         self.image_queue = Queue()
@@ -26,7 +25,6 @@ class Viewer(object):
         elif image.ndim == 2:
             image = np.repeat(image[..., np.newaxis], 3, axis=2)
         self.image_queue.put(image)
-            
 
     def view(self):
         pangolin.CreateWindowAndBind('Viewer', 1024, 768)
@@ -65,7 +63,6 @@ class Viewer(object):
         axis = pangolin.Renderable()
         axis.Add(pangolin.Axis())
 
-
         trajectory = DynamicArray()
         camera = None
         image = None
@@ -88,7 +85,6 @@ class Viewer(object):
             gl.glClearColor(1.0, 1.0, 1.0, 1.0)
             dcam.Activate(scam)
 
-
             # draw axis
             axis.Render()
 
@@ -110,10 +106,8 @@ class Viewer(object):
                 dimg.Activate()
                 gl.glColor3f(1.0, 1.0, 1.0)
                 texture.RenderToViewport()
-                
+
             pangolin.FinishFrame()
-
-
 
 
 class DynamicArray(object):
@@ -131,7 +125,7 @@ class DynamicArray(object):
 
     def append(self, x):
         self.extend([x])
-    
+
     def extend(self, xs):
         if len(xs) == 0:
             return
@@ -161,8 +155,6 @@ class DynamicArray(object):
     def __iter__(self):
         for x in self.data[:self.ind]:
             yield x
-
-
 
 
 if __name__ == '__main__':
